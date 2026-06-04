@@ -63,3 +63,4 @@ def remove_empty_directories(root: Path) -> int:
 
 if __name__ == "__main__":
     move_review_files()
+    input("Press Enter to exit...")
