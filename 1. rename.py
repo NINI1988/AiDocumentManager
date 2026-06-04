@@ -21,16 +21,13 @@ MODE = Mode.MOVE
 
 
 def main():
+    FOLDER_INBOX.mkdir(exist_ok=True)
     FOLDER_REVIEW.mkdir(exist_ok=True)
     FOLDER_UNSURE.mkdir(exist_ok=True)
-
-    if not FOLDER_INBOX.exists():
-        print("Source folder not found:", FOLDER_INBOX)
-        return
     
     pdfs = sorted(FOLDER_INBOX.glob("*.pdf"))
     if not pdfs:
-        print("No PDFs found.")
+        print(f"No PDFs found in '{FOLDER_INBOX}'.")
         return
 
     # Phase 1: Parse all files
