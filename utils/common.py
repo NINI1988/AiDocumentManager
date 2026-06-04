@@ -3,6 +3,7 @@ from pathlib import Path
 from dataclasses import dataclass
 import re
 import datetime
+import sys
 from typing import List, Tuple, Optional
 from enum import Enum
 
@@ -134,3 +135,7 @@ def apply_file_operation(doc: Doc, mode: Mode) -> None:
         shutil.copy(str(doc.path), str(final_target))
         doc.target = final_target
     # else: NO_CHANGE, do nothing
+
+def wait_if_not_debugging():
+    if sys.gettrace() is None:
+        input("Press Enter to exit...")

@@ -1,4 +1,5 @@
 # handlers package
+from handlers.deka import DekaBankHandler
 from handlers.rente import RentenversicherungHandler
 
 from .canway import CanwayMeldebescheinigungZurSozialversicherungHandler, CanwayRechnungHandler
@@ -6,7 +7,8 @@ from .canway import CanwayMeldebescheinigungZurSozialversicherungHandler, Canway
 HANDLERS = [
     CanwayRechnungHandler(),
     CanwayMeldebescheinigungZurSozialversicherungHandler(),
-    RentenversicherungHandler()
+    RentenversicherungHandler(),
+    DekaBankHandler()
 ]
 
-__all__ = ["CanwayRechnungHandler", "CanwayMeldebescheinigungZurSozialversicherungHandler", "RentenversicherungHandler", "HANDLERS"]
+__all__ = ["CanwayRechnungHandler", "CanwayMeldebescheinigungZurSozialversicherungHandler", "RentenversicherungHandler", "DekaBankHandler", "HANDLERS"]

@@ -1,7 +1,7 @@
 from pathlib import Path
 import shutil
 
-from utils.common import FOLDER_REVIEW, print_rows_table
+from utils.common import FOLDER_REVIEW, print_rows_table, wait_if_not_debugging
 
 DEST_ROOT = Path(r"G:\Dropbox\Dokumente")
 
@@ -69,4 +69,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error during moving files: {e}")
     finally:
-        input("Press Enter to exit...")
+        wait_if_not_debugging()

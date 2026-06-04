@@ -13,11 +13,13 @@ from utils.common import (
     FOLDER_INBOX,
     FOLDER_REVIEW,
     FOLDER_UNSURE,
+    wait_if_not_debugging,
 )
 from utils.parser import parse_file
 
 # Global setting for file operation mode
 MODE = Mode.MOVE
+# MODE = Mode.NO_CHANGE
 
 
 def main():
@@ -54,4 +56,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    input("Press Enter to exit...")
+    wait_if_not_debugging()
