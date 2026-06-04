@@ -8,9 +8,9 @@ from utils.common import (
     Doc,
     Mode,
     SCRIPT_DIR,
-    INBOX_FOLDER,
-    REVIEW_FOLDER,
-    REVIEW_UNSURE_FOLDER,
+    FOLDER_INBOX,
+    FOLDER_REVIEW,
+    FOLDER_UNSURE,
 )
 from utils.parser import parse_file
 
@@ -19,14 +19,14 @@ MODE = Mode.NO_CHANGE
 
 
 def main():
-    REVIEW_FOLDER.mkdir(exist_ok=True)
-    REVIEW_UNSURE_FOLDER.mkdir(exist_ok=True)
-    
-    if not INBOX_FOLDER.exists():
-        print("Source folder not found:", INBOX_FOLDER)
+    FOLDER_REVIEW.mkdir(exist_ok=True)
+    FOLDER_UNSURE.mkdir(exist_ok=True)
+
+    if not FOLDER_INBOX.exists():
+        print("Source folder not found:", FOLDER_INBOX)
         return
     
-    pdfs = sorted(INBOX_FOLDER.glob("*.pdf"))
+    pdfs = sorted(FOLDER_INBOX.glob("*.pdf"))
     if not pdfs:
         print("No PDFs found.")
         return

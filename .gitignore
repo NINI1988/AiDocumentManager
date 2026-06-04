@@ -1,6 +1,10 @@
 maxdesk.ini2
 PP11Thumbs.ptn
 PP11Thumbs.ptn2
-Inbox/
-Review/
+1. Inbox/
+2. Unsure/
+3. Review/
+tmp/
 __pycache__/
+*.pyc
+.vscode/

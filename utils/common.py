@@ -13,9 +13,9 @@ from PyPDF2 import PdfReader
 # Project-level folders and mode enum
 # SCRIPT_DIR is the workspace root (parent of the folder containing utils)
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
-INBOX_FOLDER = SCRIPT_DIR / "Inbox"
-REVIEW_FOLDER = SCRIPT_DIR / "Review"
-REVIEW_UNSURE_FOLDER = SCRIPT_DIR / "ReviewUnsure"
+FOLDER_INBOX = SCRIPT_DIR / "1. Inbox"
+FOLDER_REVIEW = SCRIPT_DIR / "3. Review"
+FOLDER_UNSURE = SCRIPT_DIR / "2. Unsure"
 
 
 def extract_text(path: Path, max_pages: int = 5) -> str:
@@ -75,7 +75,7 @@ def build_name(d: datetime.date, subj: str) -> str:
 class HandlerResult:
     subject: str
     date: Optional[datetime.date]
-    subfolder: str  # relative to REVIEW_FOLDER
+    subfolder: str  # relative to FOLDER_REVIEW
 
 
 @dataclass

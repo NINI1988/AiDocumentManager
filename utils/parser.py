@@ -9,8 +9,8 @@ from utils.common import (
     file_mod_date,
     HandlerResult,
     Doc,
-    REVIEW_FOLDER,
-    REVIEW_UNSURE_FOLDER,
+    FOLDER_REVIEW,
+    FOLDER_UNSURE,
 )
 from handlers import HANDLERS
 
@@ -42,10 +42,10 @@ def parse_file(path: Path) -> Doc:
     handler_result = _process_handlers(path, txt)
 
     if handler_result:
-        target = REVIEW_FOLDER / handler_result.subfolder
+        target = FOLDER_REVIEW / handler_result.subfolder
     else:
         handler_result = _fallback_handler(txt, path)
-        target = REVIEW_UNSURE_FOLDER
+        target = FOLDER_UNSURE
        
     date = handler_result.date or extract_date_from_text(txt) or file_mod_date(path)
     subj = handler_result.subject
