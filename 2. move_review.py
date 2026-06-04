@@ -35,10 +35,6 @@ def move_review_files() -> None:
     if not files:
         print("No files found to move.")
 
-    removed_dirs = remove_empty_directories(FOLDER_REVIEW)
-    if removed_dirs:
-        print(f"Removed {removed_dirs} empty folder(s) from '{FOLDER_REVIEW}'.")
-
     if moved == 0:
         if not files:
             return
@@ -47,6 +43,10 @@ def move_review_files() -> None:
 
     print_rows_table(rows)
     print(f"Done. {moved}/{len(files)} file(s) moved.")
+    
+    removed_dirs = remove_empty_directories(FOLDER_REVIEW)
+    if removed_dirs:
+        print(f"Removed {removed_dirs} empty folder(s) from '{FOLDER_REVIEW}'.")
 
 
 def remove_empty_directories(root: Path) -> int:
