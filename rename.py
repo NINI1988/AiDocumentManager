@@ -2,6 +2,8 @@
 
 from typing import List
 
+from tqdm import tqdm
+
 from utils.common import (
     print_docs_table,
     apply_file_operation,
@@ -35,13 +37,15 @@ def main():
     print(f"Mode: '{MODE.value}'")
     print(f"Parsing {len(pdfs)} files...\n")
     docs: List[Doc] = []
-    for p in pdfs:
+
+    for p in tqdm(pdfs, desc="Parsing files", unit="file"):
         try:
             doc = parse_file(p)
             docs.append(doc)
         except Exception as e:
             print(f"Error parsing {p.name}: {e}")
 
+    print()
     print_docs_table(docs, SCRIPT_DIR)
 
     for doc in docs:

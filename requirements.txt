@@ -1,0 +1,5 @@
+PyPDF2
+tqdm
+
+# Optional/test dependencies
+# pytest
