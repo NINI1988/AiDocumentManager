@@ -1,5 +1,6 @@
 PyPDF2
 tqdm
+rapidfuzz
 
 # Optional/test dependencies
 # pytest

@@ -1,8 +1,9 @@
 # handlers package
-from .canway import CanwayRechnungHandler
+from .canway import CanwayMeldebescheinigungZurSozialversicherungHandler, CanwayRechnungHandler
 
 HANDLERS = [
     CanwayRechnungHandler(),
+    CanwayMeldebescheinigungZurSozialversicherungHandler()
 ]
 
-__all__ = ["CanwayRechnungHandler", "HANDLERS"]
+__all__ = ["CanwayRechnungHandler", "CanwayMeldebescheinigungZurSozialversicherungHandler", "HANDLERS"]

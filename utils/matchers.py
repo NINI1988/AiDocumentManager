@@ -1,6 +1,11 @@
 import re
-from difflib import SequenceMatcher
 import datetime
+
+from rapidfuzz import fuzz
+
+
+def normalize_text(text: str) -> str:
+    return " ".join(re.findall(r"\w+", (text or "").lower()))
 
 
 def extract_date_from_text(text: str):
@@ -46,47 +51,48 @@ MONTH_NAME_MAP = {
 
 
 def fuzzy_match(text: str, pattern: str, threshold: float = 0.95) -> bool:
-    """Return True if `text` and `pattern` are similar above `threshold`."""
+    """Return True if `text` and `pattern` are similar above `threshold`.
+
+    vergleicht zwei Strings als Ganzes
+    sinnvoll, wenn beide Texte in etwa gleich lang sind
+    Beispiel: vollständige Dokumentüberschrift vs. Referenztext
+    """
     if not text or not pattern:
         return False
-    ratio = SequenceMatcher(None, re.sub(r"\s+", " ", text.lower()), re.sub(r"\s+", " ", pattern.lower())).ratio()
-    return ratio >= threshold
+    norm_text = normalize_text(text)
+    norm_pattern = normalize_text(pattern)
+    return fuzz.ratio(norm_pattern, norm_text, score_cutoff=int(threshold * 100)) >= int(threshold * 100)
 
 
 def fuzzy_contains(text: str, pattern: str, threshold: float = 0.95) -> bool:
-    """Return True if a fuzzy occurrence of `pattern` exists inside `text`."""
+    """Return True if a fuzzy occurrence of `pattern` exists inside `text`.
+
+    sucht den besten Teilabgleich zwischen den Strings
+    ideal, wenn ein kürzeres Muster in einem längeren, verrauschten Text vorkommt
+    """
     if not text or not pattern:
         return False
-    text_tokens = re.findall(r"\w+", text.lower())
-    pat_tokens = re.findall(r"\w+", pattern.lower())
-    if not pat_tokens:
-        return False
-    p_len = len(pat_tokens)
-    for n in range(max(1, p_len - 1), p_len + 2):
-        if n > len(text_tokens):
-            break
-        for i in range(0, len(text_tokens) - n + 1):
-            window = " ".join(text_tokens[i : i + n])
-            if SequenceMatcher(None, window, " ".join(pat_tokens)).ratio() >= threshold:
-                return True
-    return False
+    norm_text = normalize_text(text)
+    norm_pattern = normalize_text(pattern)
+    return fuzz.partial_ratio(norm_pattern, norm_text, score_cutoff=int(threshold * 100)) >= int(threshold * 100)
 
 
 def fuzzy_find(text: str, pattern: str, threshold: float = 0.95):
     """Return the first fuzzy matching substring span for pattern inside text."""
     if not text or not pattern:
         return None
-    norm_text = re.sub(r"\s+", " ", text.lower())
-    norm_pattern = re.sub(r"\s+", " ", pattern.lower())
+    norm_text = normalize_text(text)
+    norm_pattern = normalize_text(pattern)
     pattern_len = len(norm_pattern)
     if pattern_len == 0:
         return None
+    score_cutoff = int(threshold * 100)
     min_len = max(1, pattern_len - 2)
     max_len = pattern_len + 3
     for window_size in range(min_len, max_len + 1):
         for start in range(0, len(norm_text) - window_size + 1):
             window = norm_text[start : start + window_size]
-            if SequenceMatcher(None, window, norm_pattern).ratio() >= threshold:
+            if fuzz.ratio(window, norm_pattern, score_cutoff=score_cutoff) >= score_cutoff:
                 return start, start + window_size
     return None
 
