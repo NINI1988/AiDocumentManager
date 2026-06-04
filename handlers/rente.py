@@ -20,7 +20,7 @@ def extract_subject_after_date(text: str) -> Optional[str]:
 
 class RentenversicherungHandler(BaseHandler):
     def handle(self, text: str, path: Path) -> Optional[HandlerResult]:
-        if not fuzzy_contains(text, "Deutsche Rentenversicherung", threshold=0.65):
+        if not fuzzy_contains(text, "Deutsche Rentenversicherung", threshold=0.95):
             return None
 
         subj = extract_subject_after_date(text) or "Deutsche Rentenversicherung"

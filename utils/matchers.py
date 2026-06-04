@@ -74,7 +74,9 @@ def fuzzy_contains(text: str, pattern: str, threshold: float = 0.95) -> bool:
         return False
     norm_text = normalize_text(text)
     norm_pattern = normalize_text(pattern)
-    return fuzz.partial_ratio(norm_pattern, norm_text, score_cutoff=int(threshold * 100)) >= int(threshold * 100)
+    threshold_100 = threshold * 100
+    ratio = fuzz.partial_ratio(norm_pattern, norm_text, score_cutoff=threshold_100)
+    return ratio >= threshold_100
 
 
 def fuzzy_find(text: str, pattern: str, threshold: float = 0.95):
