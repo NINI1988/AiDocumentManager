@@ -4,7 +4,6 @@ from typing import Optional
 
 from utils.common import (
     extract_text,
-    extract_date_from_text,
     build_name,
     file_mod_date,
     HandlerResult,
@@ -13,6 +12,7 @@ from utils.common import (
     FOLDER_UNSURE,
 )
 from handlers import HANDLERS
+from utils.matchers import extract_date_from_text
 
 
 def _fallback_handler(text: str, path: Path) -> HandlerResult:

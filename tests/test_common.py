@@ -1,6 +1,6 @@
 import unittest
 
-from utils.common import fuzzy_contains, fuzzy_extract_month_year
+from utils.matchers import fuzzy_contains, fuzzy_extract_month_year
 
 
 class TestFuzzyUtilities(unittest.TestCase):

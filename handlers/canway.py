@@ -1,6 +1,7 @@
 from typing import Optional
 from pathlib import Path
-from utils.common import BaseHandler, HandlerResult, fuzzy_contains, fuzzy_extract_month_year
+from utils.common import BaseHandler, HandlerResult
+from utils.matchers import fuzzy_contains, fuzzy_extract_month_year
 
 
 class CanwayRechnungHandler(BaseHandler):
