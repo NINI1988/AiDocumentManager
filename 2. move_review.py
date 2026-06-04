@@ -17,7 +17,7 @@ def move_review_files() -> None:
 
     files = [path for path in FOLDER_REVIEW.rglob("*") if path.is_file()]
     moved = 0
-    rows: list[tuple[str, str]] = []
+    # rows: list[tuple[str, str]] = []
 
     for src_path in files:
         relative_path = src_path.relative_to(FOLDER_REVIEW)
@@ -32,7 +32,8 @@ def move_review_files() -> None:
         try:
             shutil.move(str(src_path), str(dest_path))
             moved += 1
-            rows.append((str(src_path), str(dest_path)))
+            # rows.append((str(src_path), str(dest_path)))
+            print(f"Moved: {dest_path}")
         except Exception as exc:
             print(f"Failed to move {src_path}: {exc}")
 
@@ -42,7 +43,7 @@ def move_review_files() -> None:
         print("No files were moved.")
         return
 
-    print_rows_table(rows)
+    # print_rows_table(rows)
     print(f"Done. {moved}/{len(files)} file(s) moved.")
     
     removed_dirs = remove_empty_directories(FOLDER_REVIEW)
