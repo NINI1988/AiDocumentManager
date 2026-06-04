@@ -3,6 +3,7 @@
 # Comments in English. Use dataclasses. Keep functions short.
 
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 import re
 import shutil
@@ -11,16 +12,29 @@ from typing import Optional
 
 # PDF lib
 from PyPDF2 import PdfReader
+
+class Mode(Enum):
+    """File operation mode."""
+    NO_CHANGE = "NO_CHANGE"
+    MOVE = "MOVE"
+    COPY = "COPY"
+
 SCRIPT_DIR = Path(__file__).parent
-SRC_FOLDER = SCRIPT_DIR / "Inbox"
-DST = SRC_FOLDER / "Review"
-DST.mkdir(exist_ok=True)
+INBOX_FOLDER = SCRIPT_DIR / "Inbox"
+REVIEW_FOLDER = SCRIPT_DIR / "Review"
+REVIEW_FOLDER.mkdir(exist_ok=True)
+REVIEW_UNSURE_FOLDER = SCRIPT_DIR / "ReviewUnsure"
+REVIEW_UNSURE_FOLDER.mkdir(exist_ok=True)
+
+# Global setting for file operation mode
+MODE = Mode.NO_CHANGE
 
 @dataclass
 class Doc:
     path: Path
     subject: str
     date: datetime.date
+    target: Path
 
 def extract_text(path: Path, max_pages: int = 5) -> str:
     """Extract embedded OCR/text from first pages."""
@@ -91,7 +105,8 @@ def handle_canway_rechnung(text: str) -> Optional[str]:
         year = m.group(2)
         return f"Abrechnung Canway {year}.{month}"
 
-def process_file(path: Path) -> None:
+def parse_file(path: Path) -> Doc:
+    """Parse a PDF file and return Doc with target path."""
     txt = extract_text(path)
     subj = ""
     date = None
@@ -110,32 +125,76 @@ def process_file(path: Path) -> None:
             subj = lines[0] if lines else "No Subject"
     if not date:
         date = extract_date_from_text(txt) or file_mod_date(path)
-    doc = Doc(path=path, subject=subj, date=date)
-    newname = build_name(doc.date, doc.subject)
-    # target = path.with_name(newname)
-    # target = DST.with_name(newname)
-    target = DST / newname
+    
+    newname = build_name(date, subj)
+    target = REVIEW_FOLDER / "Dokumente" / newname
     base = target.stem
     counter = 1
     while target.exists():
         target = target.with_name(f"{base} ({counter}).pdf")
         counter += 1
-    shutil.move(str(path), str(target))
-    # shutil.copy(str(path), str(target))
-    print(f"{path.name} -> {target.name}")
-    print("\n\n")
+    
+    return Doc(path=path, subject=subj, date=date, target=target)
+
+def apply_file_operation(doc: Doc) -> None:
+    """Apply file operation (move/copy/no-change) based on MODE."""
+    if MODE == Mode.MOVE:
+        shutil.move(str(doc.path), str(doc.target))
+    elif MODE == Mode.COPY:
+        shutil.copy(str(doc.path), str(doc.target))
+    # else: NO_CHANGE, do nothing
+
+
+def print_docs_table(docs: list) -> None:
+    """Print an aligned table of parsed documents (Source, Target, Mode)."""
+    rows = []
+    for doc in docs:
+        try:
+            rel = doc.target.relative_to(SCRIPT_DIR)
+        except Exception:
+            rel = doc.target
+        rows.append((doc.path.name, str(rel)))
+
+    if not rows:
+        return
+
+    src_col = max(len(r[0]) for r in rows)
+    tgt_col = max(len(r[1]) for r in rows)
+    src_col = max(src_col, len("Source"))
+    tgt_col = max(tgt_col, len("Target"))
+    print(f"Mode: '{MODE.value}'")
+    print(f"Parsing {len(rows)} files...\n")
+    print(f"{'Source':<{src_col}}  {'Target':<{tgt_col}}")
+    print(f"{'-'*src_col}  {'-'*tgt_col}")
+    for src, tgt in rows:
+        print(f"{src:<{src_col}}  {tgt:<{tgt_col}}")
+    print()
 
 def main():
-    if not SRC_FOLDER.exists():
-        print("Source folder not found:", SRC_FOLDER); return
-    pdfs = sorted(SRC_FOLDER.glob("*.pdf"))
+    if not INBOX_FOLDER.exists():
+        print("Source folder not found:", INBOX_FOLDER); return
+    pdfs = sorted(INBOX_FOLDER.glob("*.pdf"))
     if not pdfs:
         print("No PDFs found."); return
+    
+    # Phase 1: Parse all files
+    print(f"Mode: '{MODE.value}'")
+    print(f"Parsing {len(pdfs)} files...\n")
+    docs = []
     for p in pdfs:
         try:
-            process_file(p)
+            doc = parse_file(p)
+            docs.append(doc)
         except Exception as e:
-            print("Error processing", p.name, e)
+            print(f"Error parsing {p.name}: {e}")
+
+    print_docs_table(docs)
+
+    for doc in docs:
+        try:
+            apply_file_operation(doc)
+        except Exception as e:
+            print(f"Error processing {doc.path.name}: {e}")
 
 if __name__ == "__main__":
     main()
