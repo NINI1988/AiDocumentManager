@@ -9,7 +9,7 @@ from utils.common import (
     apply_file_operation,
     Doc,
     Mode,
-    SCRIPT_DIR,
+    FOLDER_PROJECT,
     FOLDER_INBOX,
     FOLDER_REVIEW,
     FOLDER_UNSURE,
@@ -17,7 +17,7 @@ from utils.common import (
 from utils.parser import parse_file
 
 # Global setting for file operation mode
-MODE = Mode.NO_CHANGE
+MODE = Mode.MOVE
 
 
 def main():
@@ -46,7 +46,7 @@ def main():
             print(f"Error parsing {p.name}: {e}")
 
     print()
-    print_docs_table(docs, SCRIPT_DIR)
+    print_docs_table(docs, FOLDER_PROJECT)
 
     for doc in docs:
         try:

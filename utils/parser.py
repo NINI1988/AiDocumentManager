@@ -12,7 +12,7 @@ from utils.common import (
     FOLDER_UNSURE,
 )
 from handlers import HANDLERS
-from utils.matchers import extract_date_from_text, normalize_text
+from utils.matchers import extract_date_from_text
 
 
 def _fallback_handler(text: str, path: Path) -> HandlerResult:
@@ -38,7 +38,6 @@ def _process_handlers(path: Path, txt: str) -> Optional[HandlerResult]:
 def parse_file(path: Path) -> Doc:
     """Parse a PDF file and return Doc with target path. Does not resolve uniqueness."""
     txt = extract_text(path)
-    txt = normalize_text(txt)
 
     handler_result = _process_handlers(path, txt)
 

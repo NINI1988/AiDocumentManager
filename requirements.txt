@@ -1,6 +1,6 @@
-PyPDF2
 tqdm
 rapidfuzz
+pdfplumber
 
 # Optional/test dependencies
 # pytest

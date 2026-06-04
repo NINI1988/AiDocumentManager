@@ -6,27 +6,24 @@ import datetime
 from typing import List, Tuple, Optional
 from enum import Enum
 
-# PDF lib
-from PyPDF2 import PdfReader
+import pdfplumber
 
 
 # Project-level folders and mode enum
-# SCRIPT_DIR is the workspace root (parent of the folder containing utils)
-SCRIPT_DIR = Path(__file__).resolve().parents[1]
-FOLDER_INBOX = SCRIPT_DIR / "1. Inbox"
-FOLDER_REVIEW = SCRIPT_DIR / "3. Review"
-FOLDER_UNSURE = SCRIPT_DIR / "2. Unsure"
+# FOLDER_PROJECT is the workspace root (parent of the folder containing utils)
+FOLDER_PROJECT = Path(__file__).resolve().parents[1]
+FOLDER_INBOX = FOLDER_PROJECT / "1. Inbox"
+FOLDER_REVIEW = FOLDER_PROJECT / "3. Review"
+FOLDER_UNSURE = FOLDER_PROJECT / "2. Unsure"
 
 
 def extract_text(path: Path, max_pages: int = 5) -> str:
-    """Extract embedded OCR/text from first pages."""
+    """Extract embedded OCR/text from first pages using pdfplumber."""
     try:
-        r = PdfReader(str(path))
-        pages = r.pages[:max_pages]
         texts = []
-        for p in pages:
-            t = p.extract_text() or ""
-            texts.append(t)
+        with pdfplumber.open(path) as pdf:
+            for page in pdf.pages[:max_pages]:
+                texts.append(page.extract_text() or "")
         return "\n".join(texts)
     except Exception:
         return ""
@@ -76,16 +73,8 @@ class Mode(Enum):
     COPY = "COPY"
 
 
-def print_docs_table(docs: List, base_folder: Path) -> None:
-    """Print an aligned table of parsed documents (Source, Target) using paths relative to base_folder."""
-    rows: List[Tuple[str, str]] = []
-    for doc in docs:
-        try:
-            rel = doc.target.relative_to(base_folder)
-        except Exception:
-            rel = doc.target
-        rows.append((doc.path.name, str(rel)))
-
+def print_rows_table(rows: List[Tuple[str, str]]) -> None:
+    """Print an aligned table of (Source, Target) rows."""
     if not rows:
         return
 
@@ -98,6 +87,18 @@ def print_docs_table(docs: List, base_folder: Path) -> None:
     for src, tgt in rows:
         print(f"{src:<{src_col}}  {tgt:<{tgt_col}}")
     print()
+
+
+def print_docs_table(docs: List[Doc], base_folder: Path) -> None:
+    """Print an aligned table of parsed documents (Source, Target) using paths relative to base_folder."""
+    rows: List[Tuple[str, str]] = []
+    for doc in docs:
+        try:
+            rel = str(doc.target.relative_to(base_folder))
+        except Exception:
+            rel = str(doc.target)
+        rows.append((doc.path.name, rel))
+    print_rows_table(rows)
 
 
 def unique_path(path: Path) -> Path:
@@ -124,6 +125,7 @@ def apply_file_operation(doc: Doc, mode: Mode) -> None:
 
     # Resolve unique target once here and update doc.target to the resolved path.
     final_target: Path = unique_path(doc.target)
+    final_target.parent.mkdir(parents=True, exist_ok=True)
 
     if mode == Mode.MOVE:
         shutil.move(str(doc.path), str(final_target))
