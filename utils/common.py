@@ -1,10 +1,21 @@
+from abc import ABC, abstractmethod
 from pathlib import Path
+from dataclasses import dataclass
 import re
 import datetime
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+from enum import Enum
 
 # PDF lib
 from PyPDF2 import PdfReader
+
+
+# Project-level folders and mode enum
+# SCRIPT_DIR is the workspace root (parent of the folder containing utils)
+SCRIPT_DIR = Path(__file__).resolve().parents[1]
+INBOX_FOLDER = SCRIPT_DIR / "Inbox"
+REVIEW_FOLDER = SCRIPT_DIR / "Review"
+REVIEW_UNSURE_FOLDER = SCRIPT_DIR / "ReviewUnsure"
 
 
 def extract_text(path: Path, max_pages: int = 5) -> str:
@@ -60,6 +71,36 @@ def build_name(d: datetime.date, subj: str) -> str:
     return f"{d.strftime('%Y.%m.%d')} {sanitize(subj)}.pdf"
 
 
+@dataclass
+class HandlerResult:
+    subject: str
+    date: Optional[datetime.date]
+    subfolder: str  # relative to REVIEW_FOLDER
+
+
+@dataclass
+class Doc:
+    path: Path
+    subject: str
+    date: datetime.date
+    target: Path
+
+
+class BaseHandler(ABC):
+    """Handler interface for document recognition and metadata extraction."""
+
+    @abstractmethod
+    def handle(self, text: str, path: Path) -> Optional[HandlerResult]:
+        pass
+
+
+class Mode(Enum):
+    """File operation mode."""
+    NO_CHANGE = "NO_CHANGE"
+    MOVE = "MOVE"
+    COPY = "COPY"
+
+
 def print_docs_table(docs: List, base_folder: Path) -> None:
     """Print an aligned table of parsed documents (Source, Target) using paths relative to base_folder."""
     rows: List[Tuple[str, str]] = []
@@ -102,16 +143,17 @@ def unique_path(path: Path) -> Path:
         counter += 1
 
 
-def apply_file_operation(doc, mode) -> None:
-    """Apply file operation (move/copy/no-change) for a Doc using the provided mode.
-
-    The mode may be an Enum with a `value` attribute or a plain string.
-    """
+def apply_file_operation(doc: Doc, mode: Mode) -> None:
+    """Apply file operation (move/copy/no-change) for a Doc using the provided Mode enum."""
     import shutil
 
-    mval = getattr(mode, 'value', mode)
-    if mval == 'MOVE' or mval == 'move' or mval == 'MOVE':
-        shutil.move(str(doc.path), str(doc.target))
-    elif mval == 'COPY' or mval == 'copy':
-        shutil.copy(str(doc.path), str(doc.target))
+    # Resolve unique target once here and update doc.target to the resolved path.
+    final_target: Path = unique_path(doc.target)
+
+    if mode == Mode.MOVE:
+        shutil.move(str(doc.path), str(final_target))
+        doc.target = final_target
+    elif mode == Mode.COPY:
+        shutil.copy(str(doc.path), str(final_target))
+        doc.target = final_target
     # else: NO_CHANGE, do nothing
