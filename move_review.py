@@ -34,14 +34,31 @@ def move_review_files() -> None:
 
     if not files:
         print("No files found to move.")
-        return
+
+    removed_dirs = remove_empty_directories(FOLDER_REVIEW)
+    if removed_dirs:
+        print(f"Removed {removed_dirs} empty folder(s) from '{FOLDER_REVIEW}'.")
 
     if moved == 0:
+        if not files:
+            return
         print("No files were moved.")
         return
 
     print_rows_table(rows)
     print(f"Done. {moved}/{len(files)} file(s) moved.")
+
+
+def remove_empty_directories(root: Path) -> int:
+    """Remove empty directories recursively under root and return how many were removed."""
+    removed = 0
+    for directory in sorted((p for p in root.rglob("*") if p.is_dir()), reverse=True):
+        try:
+            directory.rmdir()
+            removed += 1
+        except OSError:
+            continue
+    return removed
 
 
 if __name__ == "__main__":
