@@ -1,6 +1,10 @@
 tqdm
 rapidfuzz
 pdfplumber
+scikit-learn
+joblib
+watchdog
+pandas
 
 # Optional/test dependencies
 # pytest

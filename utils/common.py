@@ -3,11 +3,15 @@ from pathlib import Path
 from dataclasses import dataclass
 import re
 import datetime
+import logging
 import sys
 from typing import List, Tuple, Optional
 from enum import Enum
 
 import pdfplumber
+
+# Unterdrücke die gesprächigen Warnungen des PDF-Parsers (pdfminer.six)
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 
 # Project-level folders and mode enum
@@ -16,6 +20,9 @@ FOLDER_PROJECT = Path(__file__).resolve().parents[1]
 FOLDER_INBOX = FOLDER_PROJECT / "1. Inbox"
 FOLDER_REVIEW = FOLDER_PROJECT / "3. Review"
 FOLDER_UNSURE = FOLDER_PROJECT / "2. Unsure"
+TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "Dokumente"
+MODEL_PATH = FOLDER_PROJECT / "classifier_model.pkl"
+LOG_FILE = FOLDER_PROJECT / "log.txt"
 
 
 def extract_text(path: Path, max_pages: int = 5) -> str:
@@ -28,6 +35,33 @@ def extract_text(path: Path, max_pages: int = 5) -> str:
         return "\n".join(texts)
     except Exception:
         return ""
+
+def extract_pdf_content(pdf_path: Path):
+    """Extrahiert Text und eine Betreff-Zeile aus einem PDF."""
+    text = ""
+    subject = "Unbekannt"
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            full_text = []
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    full_text.append(page_text)
+            
+            if not full_text:
+                return None, None
+            
+            text = "\n".join(full_text)
+            # Erste Zeile mit Inhalt als Betreff nutzen
+            lines = [l.strip() for l in text.split('\n') if len(l.strip()) > 3]
+            if lines:
+                # Bereinige den Betreff von ungültigen Zeichen
+                subject = "".join(c for c in lines[0] if c.isalnum() or c in " -_")[:50]
+                
+        return text, subject
+    except Exception as e:
+        logging.error(f"Fehler beim Lesen von {pdf_path}: {e}")
+        return None, None
 
 
 def sanitize(s: str) -> str:

@@ -7,3 +7,5 @@ PP11Thumbs.ptn2
 tmp/
 __pycache__/
 *.pyc
+test_documents/
+classifier_model.pkl
