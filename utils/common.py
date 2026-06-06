@@ -20,7 +20,8 @@ FOLDER_PROJECT = Path(__file__).resolve().parents[1]
 FOLDER_INBOX = FOLDER_PROJECT / "1. Inbox"
 FOLDER_REVIEW = FOLDER_PROJECT / "3. Review"
 FOLDER_UNSURE = FOLDER_PROJECT / "2. Unsure"
-TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "Dokumente"
+# TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "Dokumente"
+TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "alleDokumente"
 MODEL_PATH = FOLDER_PROJECT / "classifier_model.pkl"
 TRAIN_CACHE_PATH = FOLDER_PROJECT / "train_cache.joblib"
 LOG_FILE = FOLDER_PROJECT / "log.txt"
@@ -99,6 +100,11 @@ class BaseHandler(ABC):
 
     @abstractmethod
     def handle(self, text: str, path: Path) -> Optional[HandlerResult]:
+        pass
+
+    @abstractmethod
+    def get_categories(self) -> List[str]:
+        """Return a list of categories this handler can process."""
         pass
 
 

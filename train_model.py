@@ -76,7 +76,6 @@ def train_model() -> Optional[Pipeline]:
         except Exception as e:
             logging.warning(f"Konnte Cache nicht laden: {e}")
 
-    current_cache = {}
     cache_hits = 0
     
     for pdf_file in tqdm(all_pdf_files, desc="PDFs verarbeiten", unit="file"):
@@ -86,7 +85,8 @@ def train_model() -> Optional[Pipeline]:
         if not parts:
             continue
         
-        label = os.path.join(*parts[:2]) # Max 2 Ebenen
+        # label = os.path.join(*parts[:2]) # Max 2 Ebenen
+        label = os.path.join(*parts) # Max 2 Ebenen
         
         # Hash berechnen für Cache-Prüfung
         file_hash = get_file_hash(pdf_file)
@@ -97,9 +97,8 @@ def train_model() -> Optional[Pipeline]:
         else:
             text, _ = extract_pdf_content(pdf_file)
             norm_text = normalize_text(text) if text else ""
-
-        # In den aktuellen Cache für diesen Lauf übernehmen
-        current_cache[file_hash] = norm_text
+            # Neuen Text in den persistenten Cache aufnehmen
+            cache[file_hash] = norm_text
 
         if norm_text and len(norm_text.strip()) > 10:
             X.append(norm_text)
@@ -110,7 +109,7 @@ def train_model() -> Optional[Pipeline]:
         return None
 
     # Neuen Cache speichern
-    joblib.dump(current_cache, TRAIN_CACHE_PATH)
+    joblib.dump(cache, TRAIN_CACHE_PATH)
     logging.info(f"Verarbeitung abgeschlossen. Cache-Treffer: {cache_hits}, Neu eingelesen: {len(all_pdf_files) - cache_hits}")
 
     pipeline = Pipeline([
@@ -122,15 +121,23 @@ def train_model() -> Optional[Pipeline]:
             min_df=2,
             max_df=0.7,  # Strenger: Wörter, die in >70% der Docs vorkommen, fliegen raus
             sublinear_tf=True,  # Dämpft die Häufigkeit (10x "Auto" ist nicht 10x so wichtig wie 1x)
-            # # WICHTIG: Nur Wörter mit mind. 3 Buchstaben, keine reinen Zahlen
-            # token_pattern=r"(?u)\b[a-zA-ZäöüÄÖÜß]{3,}\b"
             
+            
+            # analyzer="word",
+            # ngram_range=(1, 2),
+            # stop_words=GERMAN_STOP_WORDS,
+            # min_df=1,
+            # max_df=0.9,
+            # sublinear_tf=True,
             # token_pattern=r"(?u)\b[a-zA-Z0-9äöüÄÖÜß]{3,}\b"
         )),
-        # Feature Selection: Behalte nur die Wörter/Phrasen, die am 
-        # stärksten zwischen den Kategorien unterscheiden
-        # ('chi2', SelectKBest(chi2, k=5000)), 
-        ('clf', MultinomialNB())
+        # alpha=1.0 → stark geglättet (robuster, aber weniger präzise)
+        # alpha=0.1 → Standard in vielen Textfällen
+        # alpha=0.01 → sehr wenig Glättung, sehr „aggressiv auf Daten“
+        # alpha=0.0 → nicht empfohlen (instabil)
+        # ('chi2', SelectKBest(chi2, k=5000)),
+        ('clf', MultinomialNB(alpha=1))
+        # ('clf', MultinomialNB(alpha=0.01))
     ])
     
     logging.info(f"Pipeline Fit startet. Anzahl Dokumente: {len(X)}, Anzahl Kategorien: {len(set(y))}")

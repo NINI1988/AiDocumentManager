@@ -30,7 +30,7 @@ def inspect():
     print("-" * 30)
 
     # Die wichtigsten Wörter pro Kategorie finden
-    for i, category in enumerate(classes):
+    for i, category in enumerate(classes[:20]):
         # Die Log-Wahrscheinlichkeiten für diese Klasse abrufen
         # (Bei MultinomialNB sind das die Koeffizienten)
         probs = classifier.feature_log_prob_[i]

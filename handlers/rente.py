@@ -1,5 +1,5 @@
 import re
-from typing import Optional
+from typing import Optional, List
 from pathlib import Path
 from utils.common import BaseHandler, HandlerResult
 from utils.matchers import fuzzy_contains, fuzzy_extract_month_year
@@ -19,9 +19,12 @@ def extract_subject_after_date(text: str) -> Optional[str]:
 
 
 class RentenversicherungHandler(BaseHandler):
+    def get_categories(self) -> List[str]:
+        return ["Versicherungen\\Deutsche Rentenversicherung"]
+
     def handle(self, text: str, path: Path) -> Optional[HandlerResult]:
-        if not fuzzy_contains(text, "Deutsche Rentenversicherung", threshold=0.95):
-            return None
+        # if not fuzzy_contains(text, "Deutsche Rentenversicherung", threshold=0.95):
+        #     return None
 
         subj = extract_subject_after_date(text) or "Deutsche Rentenversicherung"
         return HandlerResult(subject=subj, date=None, subfolder="Versicherungen\\Deutsche Rentenversicherung")
