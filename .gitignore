@@ -8,4 +8,6 @@ tmp/
 __pycache__/
 *.pyc
 test_documents/
-classifier_model.pkl
+*.pkl
+log.txt
+train_cache.joblib

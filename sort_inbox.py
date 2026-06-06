@@ -1,10 +1,13 @@
 import os
 import time
 import logging
+from typing import Optional
 import joblib
 import pdfplumber
 from pathlib import Path # Keep Path for BASE_PATH, INBOX_PATH etc.
 from datetime import datetime
+
+from sklearn.pipeline import Pipeline
 
 from train_model import train_model # Import train_model from its new home
 from utils.matchers import extract_date_from_text, normalize_text
@@ -21,12 +24,12 @@ logging.basicConfig(
     handlers=[logging.FileHandler(LOG_FILE, encoding="utf-8"), logging.StreamHandler()]
 )
 
-def get_model():
+def get_model() -> Optional[Pipeline]:
     if MODEL_PATH.exists():
         return joblib.load(MODEL_PATH)
     return train_model()
 
-def process_file(file_path: Path, model):
+def process_file(file_path: Path, model: Pipeline):
     """Klassifiziert und verschiebt eine einzelne Datei."""
     if not file_path.suffix.lower() == ".pdf":
         return
@@ -47,6 +50,12 @@ def process_file(file_path: Path, model):
     # 3. Klassifizierung
     norm_text = normalize_text(text)
     probs = model.predict_proba([norm_text])[0]
+    
+    # Beispiel für Debug-Logging in sort_inbox.py
+    top_indices = probs.argsort()[-3:][::-1]
+    for idx in top_indices:
+        logging.info(f"  Mögliche Kategorie: {model.classes_[idx]} ({probs[idx]:.2f})")
+
     best_idx = probs.argmax()
     confidence = probs[best_idx]
     category = model.classes_[best_idx]
@@ -75,7 +84,7 @@ def process_file(file_path: Path, model):
 
 def move_to(src: Path, dest_folder: Path, new_name: str = None, conf: float = 0.0):
     """Hilfsfunktion zum sicheren Verschieben und Erstellen von Ordnern."""
-    dest_folder.mkdir(parents=True, exist_ok=True)
+    # dest_folder.mkdir(parents=True, exist_ok=True)
     target_name = new_name if new_name else src.name
     dest_path = dest_folder / target_name
     
@@ -84,8 +93,8 @@ def move_to(src: Path, dest_folder: Path, new_name: str = None, conf: float = 0.
         dest_path = dest_folder / f"{int(time.time())}_{target_name}"
 
     try:
-        src.rename(dest_path)
-        logging.info(f"Verschoben: {target_name} -> {dest_folder.relative_to(FOLDER_PROJECT)} (Konfidenz: {conf:.2f})")
+        # src.rename(dest_path)
+        logging.info(f"Verschoben: {dest_path} ({target_name}) -> {dest_folder.relative_to(FOLDER_PROJECT)} (Konfidenz: {conf:.2f})")
     except Exception as e:
         logging.error(f"Fehler beim Verschieben von {src.name}: {e}")
 

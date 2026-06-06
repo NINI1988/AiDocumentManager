@@ -1,6 +1,6 @@
 import joblib
 import pandas as pd
-from utils.common import MODEL_PATH
+from utils.common import MODEL_PATH, wait_if_not_debugging
 
 def inspect():
     if not MODEL_PATH.exists():
@@ -12,6 +12,7 @@ def inspect():
     
     # Komponenten aus der Pipeline extrahieren
     vectorizer = pipeline.named_steps['tfidf']
+    selector = pipeline.named_steps.get('chi2')
     classifier = pipeline.named_steps['clf']
     
     # Kategorien (Labels)
@@ -19,9 +20,13 @@ def inspect():
     # Wörter (Features)
     feature_names = vectorizer.get_feature_names_out()
 
+    # Falls ein Feature-Selector verwendet wurde, müssen die Namen gefiltert werden
+    if selector:
+        feature_names = feature_names[selector.get_support()]
+
     print(f"--- Modell-Analyse ---")
     print(f"Gefundene Kategorien: {len(classes)}")
-    print(f"Vokabular-Größe: {len(feature_names)} Wörter")
+    print(f"Vokabular-Größe (genutzt): {len(feature_names)} Wörter")
     print("-" * 30)
 
     # Die wichtigsten Wörter pro Kategorie finden
@@ -42,6 +47,5 @@ if __name__ == "__main__":
         inspect()
     except Exception as e:
         print(f"Fehler bei der Inspektion: {e}")
-    
-    print("\nDrücke Enter zum Beenden...")
-    input()
+        
+    # wait_if_not_debugging()

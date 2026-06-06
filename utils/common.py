@@ -22,6 +22,7 @@ FOLDER_REVIEW = FOLDER_PROJECT / "3. Review"
 FOLDER_UNSURE = FOLDER_PROJECT / "2. Unsure"
 TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "Dokumente"
 MODEL_PATH = FOLDER_PROJECT / "classifier_model.pkl"
+TRAIN_CACHE_PATH = FOLDER_PROJECT / "train_cache.joblib"
 LOG_FILE = FOLDER_PROJECT / "log.txt"
 
 
