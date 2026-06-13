@@ -6,11 +6,12 @@ from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
 from train_model import train_model
+from train_subject_model import predict_subject
 from handlers import HANDLERS
 from utils.matchers import extract_date_from_text, normalize_text
 from utils.common import (
     FOLDER_PROJECT, FOLDER_INBOX, FOLDER_UNSURE, FOLDER_REVIEW,
-    MODEL_PATH, LOG_FILE, extract_pdf_content, build_name, 
+    MODEL_PATH, SUBJECT_MODEL_PATH, LOG_FILE, extract_pdf_content, build_name, 
     Doc, Mode, apply_file_operation, file_mod_date, BaseHandler,
     wait_if_not_debugging
 )
@@ -32,11 +33,16 @@ def get_model() -> Optional[Pipeline]:
         return joblib.load(MODEL_PATH)
     return train_model()
 
+def get_subject_model() -> Optional[Pipeline]:
+    if SUBJECT_MODEL_PATH.exists():
+        return joblib.load(SUBJECT_MODEL_PATH)
+    return None
+
 def find_handlers(category: str) -> List[BaseHandler]:
     """Findet alle Handler, die für eine bestimmte Kategorie zuständig sind."""
     return [h for h in HANDLERS if category in h.get_categories()]
 
-def process_file(file_path: Path, model: Pipeline):
+def process_file(file_path: Path, model: Pipeline, subject_model: Optional[Pipeline] = None):
     """Klassifiziert und verschiebt eine einzelne Datei unter Verwendung von Handlern."""
     if not file_path.suffix.lower() == ".pdf":
         return
@@ -66,9 +72,19 @@ def process_file(file_path: Path, model: Pipeline):
     confidence = probs[best_idx]
     category = model.classes_[best_idx]
 
+    # Neu: ML-basierte Betreff-Erkennung
+    ml_subject = None
+    if subject_model:
+        try:
+            ml_subject = predict_subject(file_path, subject_model)
+            if ml_subject:
+                logging.info(f"  ML-Betreff erkannt: {ml_subject}")
+        except Exception as e:
+            logging.error(f"Fehler bei ML-Betreff-Erkennung: {e}")
+
     # 3. Metadaten-Extraktion (Datum, Subfolder, Subject)
     doc_date = extract_date_from_text(text)
-    final_subject = first_line_subject or "Unbekannt"
+    final_subject = ml_subject or first_line_subject or "Unbekannt"
     final_subfolder = category
     target_base = FOLDER_REVIEW
     reason = None
@@ -117,6 +133,8 @@ def main():
     if not model:
         print(f"No Model found '{MODEL_PATH}'.")
         return
+        
+    subject_model = get_subject_model()
 
     files = list(FOLDER_INBOX.glob("*.pdf"))
     if not files:
@@ -128,7 +146,7 @@ def main():
     print(f"Parsing {len(files)} files...\n")
 
     for file_path in tqdm(files, desc="Parsing files", unit="file"):
-        process_file(file_path, model)
+        process_file(file_path, model, subject_model)
 
 
 

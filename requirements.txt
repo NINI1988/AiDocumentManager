@@ -1,10 +1,9 @@
+pdfplumber
+joblib
+pandas
+numpy
 tqdm
 rapidfuzz
-pdfplumber
+xgboost
 scikit-learn
-joblib
 watchdog
-pandas
-
-# Optional/test dependencies
-# pytest
