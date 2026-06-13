@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
 def predict_subject(pdf_path: Path, model: Pipeline):
    lines = extract_lines_with_layout(pdf_path)
-   if not lines: return None
+   if not lines: return None, 0.0
    
    df_test = pd.DataFrame([
        {**l, **get_text_features(l["text"])} for l in lines
@@ -120,6 +120,7 @@ def predict_subject(pdf_path: Path, model: Pipeline):
    probs = model.predict_proba(df_test)[:, 1]
    best_line_idx = np.argmax(probs)
    
-   if probs[best_line_idx] > 0.5:
-       return lines[best_line_idx]["text"]
-   return None
+   confidence = float(probs[best_line_idx])
+   if confidence > 0.5:
+       return lines[best_line_idx]["text"], confidence
+   return None, confidence

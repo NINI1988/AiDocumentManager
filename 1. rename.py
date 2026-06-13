@@ -76,9 +76,9 @@ def process_file(file_path: Path, model: Pipeline, subject_model: Optional[Pipel
     ml_subject = None
     if subject_model:
         try:
-            ml_subject = predict_subject(file_path, subject_model)
+            ml_subject, ml_conf = predict_subject(file_path, subject_model)
             if ml_subject:
-                logging.info(f"  ML-Betreff erkannt: {ml_subject}")
+                logging.info(f"  ML-Betreff erkannt: {ml_subject} ({ml_conf:.2f})")
         except Exception as e:
             logging.error(f"Fehler bei ML-Betreff-Erkennung: {e}")
 
