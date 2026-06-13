@@ -18,11 +18,13 @@ logging.getLogger("pdfminer").setLevel(logging.ERROR)
 # FOLDER_PROJECT is the workspace root (parent of the folder containing utils)
 FOLDER_PROJECT = Path(__file__).resolve().parents[1]
 FOLDER_INBOX = FOLDER_PROJECT / "1. Inbox"
+# FOLDER_INBOX = Path("G:/OneDrive/Scan")
 FOLDER_REVIEW = FOLDER_PROJECT / "3. Review"
 FOLDER_UNSURE = FOLDER_PROJECT / "2. Unsure"
 # TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "Dokumente"
 TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "alleDokumente"
-MODEL_PATH = FOLDER_PROJECT / "classifier_model.pkl"
+MODEL_PATH = FOLDER_PROJECT / "classifier_model_word.pkl"
+# MODEL_PATH = FOLDER_PROJECT / "classifier_model_char_wb.pkl"
 TRAIN_CACHE_PATH = FOLDER_PROJECT / "train_cache.joblib"
 LOG_FILE = FOLDER_PROJECT / "log.txt"
 

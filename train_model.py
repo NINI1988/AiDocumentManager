@@ -109,42 +109,43 @@ def train_model() -> Optional[Pipeline]:
         return None
 
     # Neuen Cache speichern
-    joblib.dump(cache, TRAIN_CACHE_PATH)
+    joblib.dump(cache, TRAIN_CACHE_PATH, compress=3)
     logging.info(f"Verarbeitung abgeschlossen. Cache-Treffer: {cache_hits}, Neu eingelesen: {len(all_pdf_files) - cache_hits}")
 
     pipeline = Pipeline([
         ('tfidf', TfidfVectorizer(
-            analyzer="char_wb",
-            ngram_range=(3, 5),
-            # ngram_range=(1, 3), # Jetzt bis zu 3 Wörter (z.B. "Deutsche Rentenversicherung Bund")
-            # stop_words=GERMAN_STOP_WORDS,
-            min_df=2,
-            max_df=0.7,  # Strenger: Wörter, die in >70% der Docs vorkommen, fliegen raus
-            sublinear_tf=True,  # Dämpft die Häufigkeit (10x "Auto" ist nicht 10x so wichtig wie 1x)
+            # analyzer="char_wb",
+            # ngram_range=(3, 5),
+            # # ngram_range=(1, 3), # Jetzt bis zu 3 Wörter (z.B. "Deutsche Rentenversicherung Bund")
+            # # stop_words=GERMAN_STOP_WORDS,
+            # min_df=2,
+            # max_df=0.7,  # Strenger: Wörter, die in >70% der Docs vorkommen, fliegen raus
+            # sublinear_tf=True,  # Dämpft die Häufigkeit (10x "Auto" ist nicht 10x so wichtig wie 1x)
             
             
-            # analyzer="word",
-            # ngram_range=(1, 2),
-            # stop_words=GERMAN_STOP_WORDS,
-            # min_df=1,
-            # max_df=0.9,
+            analyzer="word",
+            ngram_range=(1, 2),
+            stop_words=GERMAN_STOP_WORDS,
+            min_df=2, # Ignoriere Wörter/Paare, die nur in 1 Dokument vorkommen (reduziert Größe massiv)
+            max_df=0.9,
+            max_features=50000, # Deckelt die Anzahl der Merkmale
             # sublinear_tf=True,
-            # token_pattern=r"(?u)\b[a-zA-Z0-9äöüÄÖÜß]{3,}\b"
+            token_pattern=r"(?u)\b[a-zA-Z0-9äöüÄÖÜß]{3,}\b"
         )),
         # alpha=1.0 → stark geglättet (robuster, aber weniger präzise)
         # alpha=0.1 → Standard in vielen Textfällen
         # alpha=0.01 → sehr wenig Glättung, sehr „aggressiv auf Daten“
         # alpha=0.0 → nicht empfohlen (instabil)
         # ('chi2', SelectKBest(chi2, k=5000)),
-        ('clf', MultinomialNB(alpha=1))
-        # ('clf', MultinomialNB(alpha=0.01))
+        # ('clf', MultinomialNB(alpha=1))
+        ('clf', MultinomialNB(alpha=0.01))
     ])
     
     logging.info(f"Pipeline Fit startet. Anzahl Dokumente: {len(X)}, Anzahl Kategorien: {len(set(y))}")
     fit_start_time = time.time()
     pipeline.fit(X, y)
     fit_end_time = time.time()
-    joblib.dump(pipeline, MODEL_PATH)
+    joblib.dump(pipeline, MODEL_PATH, compress=3)
     logging.info(f"Modell trainiert und gespeichert: {len(X)} Dokumente, {len(set(y))} Kategorien. Fit-Dauer: {fit_end_time - fit_start_time:.2f} Sekunden.")
     return pipeline
 
