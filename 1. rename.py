@@ -114,7 +114,7 @@ def process_file(file_path: Path, model: Pipeline):
     doc = Doc(path=file_path, subject=final_subject, date=doc_date, target=dest_folder / new_name)
     
     # 4. Datei verschieben
-    logging.info(f"'{file_path}' -> '{dest_folder.relative_to(FOLDER_PROJECT) / new_name}', Reason: {reason or ''}")
+    logging.info(f"'{file_path.name}' -> '{final_subfolder}\\{new_name}', Reason: {reason or ''}")
     apply_file_operation(doc, MODE)
 
 def main():
