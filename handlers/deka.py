@@ -19,7 +19,7 @@ def extract_subject_after_date(text: str) -> Optional[str]:
 
 
 class DekaBankHandler(BaseHandler):
-    def get_categories(self) -> List[str]:
+    def get_subfolders(self) -> List[str]:
         return ["Versicherungen\\Investmentfonds Riester - Deka"]
 
     def handle(self, text: str, path: Path) -> Optional[HandlerResult]:

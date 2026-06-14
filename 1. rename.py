@@ -10,18 +10,13 @@ from train_model import train_model
 from utils.llm_extractor import extract_metadata_with_llm
 from handlers import HANDLERS
 from utils.matchers import extract_date_from_text, normalize_text
+from utils.config import MODE, SUBFOLDER_THRESHOLD
 from utils.common import (
     FOLDER_PROJECT, FOLDER_INBOX, FOLDER_UNSURE, FOLDER_REVIEW,
     MODEL_PATH, LOG_FILE, extract_pdf_content, build_name, 
     Doc, Mode, apply_file_operation, file_mod_date, BaseHandler,
     wait_if_not_debugging
 )
-
-# Global setting for file operation mode
-# MODE = Mode.MOVE
-MODE = Mode.NO_CHANGE
-
-CONFIDENCE_THRESHOLD = 0.75
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,9 +29,9 @@ def get_model() -> Optional[Pipeline]:
         return joblib.load(MODEL_PATH)
     return train_model()
 
-def find_handlers(category: str) -> List[BaseHandler]:
-    """Findet alle Handler, die für eine bestimmte Kategorie zuständig sind."""
-    return [h for h in HANDLERS if category in h.get_categories()]
+def find_handlers(subfolder: str) -> List[BaseHandler]:
+    """Findet alle Handler, die für einen bestimmten Unterordner zuständig sind."""
+    return [h for h in HANDLERS if subfolder in h.get_subfolders()]
 
 def process_file(file_path: Path, model: Pipeline):
     """Klassifiziert und verschiebt eine einzelne Datei unter Verwendung von Handlern."""
@@ -66,7 +61,7 @@ def process_file(file_path: Path, model: Pipeline):
 
     best_idx = probs.argmax()
     confidence = probs[best_idx]
-    category = model.classes_[best_idx]
+    predicted_subfolder = model.classes_[best_idx]
 
     # Neu: LLM-basierte Extraktion (Datum und Betreff)
     llm_metadata = extract_metadata_with_llm(text)
@@ -88,18 +83,18 @@ def process_file(file_path: Path, model: Pipeline):
     # 3. Metadaten-Extraktion (Datum, Subfolder, Subject)
     doc_date = llm_date or extract_date_from_text(text)
     final_subject = llm_subject or first_line_subject or "Unbekannt"
-    final_subfolder = category
+    final_subfolder = predicted_subfolder
     target_base = FOLDER_REVIEW
     reason = None
 
     # Überprüfung der Konfidenz
-    if confidence < CONFIDENCE_THRESHOLD:
+    if confidence < SUBFOLDER_THRESHOLD:
         target_base = FOLDER_UNSURE
         reason = f"Niedrige_Konfidenz_{confidence:.2f}"
     
     # Handler suchen und ausführen, falls Konfidenz hoch genug
-    if confidence >= CONFIDENCE_THRESHOLD:
-        handlers = find_handlers(str(category))
+    if confidence >= SUBFOLDER_THRESHOLD:
+        handlers = find_handlers(str(predicted_subfolder))
         for h in handlers:
             res = h.handle(text, file_path)
             if res:

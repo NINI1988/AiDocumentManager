@@ -6,27 +6,16 @@ import datetime
 import logging
 import sys
 from typing import List, Tuple, Optional
-from enum import Enum
 
 import pdfplumber
 
+from .config import (
+    FOLDER_PROJECT, FOLDER_INBOX, FOLDER_REVIEW, FOLDER_UNSURE,
+    TRAIN_DATA_PATH, MODEL_PATH, TRAIN_CACHE_PATH, LOG_FILE, Mode
+)
+
 # Unterdrücke die gesprächigen Warnungen des PDF-Parsers (pdfminer.six)
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
-
-
-# Project-level folders and mode enum
-# FOLDER_PROJECT is the workspace root (parent of the folder containing utils)
-FOLDER_PROJECT = Path(__file__).resolve().parents[1]
-FOLDER_INBOX = FOLDER_PROJECT / "1. Inbox"
-# FOLDER_INBOX = Path("G:/OneDrive/Scan")
-FOLDER_REVIEW = FOLDER_PROJECT / "3. Review"
-FOLDER_UNSURE = FOLDER_PROJECT / "2. Unsure"
-# TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "Dokumente"
-TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "alleDokumente"
-MODEL_PATH = FOLDER_PROJECT / "classifier_model_word.pkl"
-TRAIN_CACHE_PATH = FOLDER_PROJECT / "train_cache.joblib"
-LOG_FILE = FOLDER_PROJECT / "log.txt"
-
 
 def extract_text(path: Path, max_pages: int = 5) -> str:
     """Extract embedded OCR/text from first pages using pdfplumber."""
@@ -104,17 +93,9 @@ class BaseHandler(ABC):
         pass
 
     @abstractmethod
-    def get_categories(self) -> List[str]:
-        """Return a list of categories this handler can process."""
+    def get_subfolders(self) -> List[str]:
+        """Return a list of subfolders this handler can process."""
         pass
-
-
-class Mode(Enum):
-    """File operation mode."""
-    NO_CHANGE = "NO_CHANGE"
-    MOVE = "MOVE"
-    COPY = "COPY"
-
 
 def print_rows_table(rows: List[Tuple[str, str]]) -> None:
     """Print an aligned table of (Source, Target) rows."""

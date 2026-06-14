@@ -4,7 +4,7 @@ import time
 from typing import Optional, Dict, Any
 import llama_cpp
 from llama_cpp import Llama
-from utils.common import FOLDER_PROJECT
+from utils.config import FOLDER_PROJECT, LLM_MODEL_PATH
 
 def _llama_log_callback(level, message, user_data):
     """Leitet interne llama.cpp-Meldungen in eine Datei um, um die Konsole sauber zu halten."""
@@ -16,11 +16,6 @@ def _llama_log_callback(level, message, user_data):
 # Wir halten die Referenz global, damit sie nicht vom Garbage Collector entfernt wird.
 _llama_log_callback_ptr = llama_cpp.llama_log_callback(_llama_log_callback)
 
-# Pfad zum Modell aus deiner LM Studio Bibliothek
-# MODEL_PATH = r"G:\Programme\LmStudio\lmstudio-community\gemma-4-12B-it-QAT-GGUF\gemma-4-12B-it-QAT-Q4_0.gguf"
-MODEL_PATH = r"G:\Programme\LmStudio\lmstudio-community\gemma-4-E4B-it-QAT-GGUF\gemma-4-E4B-it-QAT-Q4_0.gguf"
-# MODEL_PATH = r"G:/Programme/LmStudio/Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q4_k_m.gguf"
-
 _llm_instance = None
 
 def get_llm():
@@ -28,18 +23,18 @@ def get_llm():
     global _llm_instance
     if _llm_instance is None:
         from pathlib import Path
-        if not Path(MODEL_PATH).exists():
-            logging.error(f"Modell-Datei nicht gefunden: {MODEL_PATH}")
+        if not Path(LLM_MODEL_PATH).exists():
+            logging.error(f"Modell-Datei nicht gefunden: {LLM_MODEL_PATH}")
             return None
         try:
-            logging.info(f"Initialisiere lokales LLM: {MODEL_PATH}")
+            logging.info(f"Initialisiere lokales LLM: {LLM_MODEL_PATH}")
             
             # WICHTIG: Den Logger global setzen, bevor die Instanz erstellt wird.
             # Das fängt CUDA-Initialisierungsmeldungen besser ab.
             llama_cpp.llama_log_set(_llama_log_callback_ptr, None)
 
             _llm_instance = Llama(
-                model_path=MODEL_PATH,
+                model_path=LLM_MODEL_PATH,
                 n_ctx=4096,
                 n_gpu_layers=-1,    # Lädt ALLE 42 Layer auf die GPU (befreit deinen RAM)
                 verbose=True,       # Muss True sein beim Laden, um Windows-Redirect-Crash zu vermeiden

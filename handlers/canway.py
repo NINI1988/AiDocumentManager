@@ -5,7 +5,7 @@ from utils.matchers import fuzzy_contains, fuzzy_extract_month_year
 
 
 class CanwayRechnungHandler(BaseHandler):
-    def get_categories(self) -> List[str]:
+    def get_subfolders(self) -> List[str]:
         return ["Lohnabrechnungen\\2016.06.01 Canway"]
 
     def handle(self, text: str, path: Path) -> Optional[HandlerResult]:
@@ -26,7 +26,7 @@ class CanwayRechnungHandler(BaseHandler):
 
 
 class CanwayMeldebescheinigungZurSozialversicherungHandler(BaseHandler):
-    def get_categories(self) -> List[str]:
+    def get_subfolders(self) -> List[str]:
         return ["Lohnabrechnungen\\2016.06.01 Canway"]
 
     def handle(self, text: str, path: Path) -> Optional[HandlerResult]:

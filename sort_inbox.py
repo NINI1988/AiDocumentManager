@@ -11,12 +11,11 @@ from sklearn.pipeline import Pipeline
 
 from train_model import train_model # Import train_model from its new home
 from utils.matchers import extract_date_from_text, normalize_text
+from utils.config import SUBFOLDER_THRESHOLD
 from utils.common import (
     FOLDER_PROJECT, FOLDER_INBOX, FOLDER_UNSURE, FOLDER_REVIEW,
     MODEL_PATH, LOG_FILE, extract_pdf_content
 )
-
-CONFIDENCE_THRESHOLD = 0.75
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,7 +57,7 @@ def process_file(file_path: Path, model: Pipeline):
 
     best_idx = probs.argmax()
     confidence = probs[best_idx]
-    category = model.classes_[best_idx]
+    subfolder = model.classes_[best_idx]
 
     # Fallback Datum
     if not date_str:
@@ -66,7 +65,7 @@ def process_file(file_path: Path, model: Pipeline):
         date_str = datetime.fromtimestamp(mtime).strftime("%Y.%m.%d")
         target_base = FOLDER_UNSURE
         reason = "Kein_Datum_im_Text"
-    elif confidence < CONFIDENCE_THRESHOLD:
+    elif confidence < SUBFOLDER_THRESHOLD:
         target_base = FOLDER_UNSURE
         reason = f"Niedrige_Konfidenz_{confidence:.2f}"
     else:
@@ -76,9 +75,9 @@ def process_file(file_path: Path, model: Pipeline):
     # Ziel-Pfad bauen
     new_name = f"{date_str} {extracted_subject}.pdf"
     if reason:
-        dest_folder = target_base / reason / category
+        dest_folder = target_base / reason / subfolder
     else:
-        dest_folder = target_base / category
+        dest_folder = target_base / subfolder
         
     move_to(file_path, dest_folder, new_name, confidence)
 

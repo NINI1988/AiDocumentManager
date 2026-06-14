@@ -1,10 +1,8 @@
 from pathlib import Path
 import shutil
 
+from utils.config import DEST_ROOT
 from utils.common import FOLDER_REVIEW, print_rows_table, wait_if_not_debugging
-
-DEST_ROOT = Path(r"G:\Dropbox\Dokumente")
-
 
 def move_review_files() -> None:
     if not FOLDER_REVIEW.exists():

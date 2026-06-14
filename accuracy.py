@@ -10,7 +10,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from collections import Counter
 
-from train_model import GERMAN_STOP_WORDS, get_file_hash
+from train_model import get_file_hash
+from utils.config import GERMAN_STOP_WORDS
 from utils.matchers import normalize_text
 from utils.common import TRAIN_DATA_PATH, TRAIN_CACHE_PATH, extract_pdf_content
 

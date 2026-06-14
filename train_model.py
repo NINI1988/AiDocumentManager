@@ -12,42 +12,8 @@ from sklearn.feature_selection import SelectKBest, chi2
 from tqdm import tqdm
 
 from utils.matchers import normalize_text
+from utils.config import GERMAN_STOP_WORDS
 from utils.common import TRAIN_DATA_PATH, MODEL_PATH, TRAIN_CACHE_PATH, extract_pdf_content
-
-# Einfache Liste deutscher Stop-Words zur Verbesserung der Trennschärfe
-GERMAN_STOP_WORDS = [
-    # Articles
-    "der", "die", "das", "ein", "eine", "einer", "einem", "einen",
-
-    # Pronouns
-    "ich", "du", "er", "sie", "es", "wir", "ihr", "ihnen",
-    "mein", "meine", "meiner", "meinem", "meinen",
-    "dein", "deine", "deiner", "deinem", "deinen",
-    "sein", "seine", "seiner", "seinem", "seinen",
-    "ihr", "ihre", "ihrer", "ihrem", "ihren",
-
-    # Prepositions
-    "von", "vom", "zu", "zum", "zur", "mit", "bei", "nach",
-    "für", "auf", "aus", "in", "im", "an", "am", "unter",
-    "über", "durch", "gegen", "ohne",
-
-    # Conjunctions
-    "und", "oder", "aber", "sowie", "dass", "da", "weil",
-    "wenn", "als", "ob",
-
-    # Common verbs
-    "ist", "sind", "war", "waren", "wird", "werden",
-    "hat", "haben", "hatte", "hatten",
-    "kann", "können", "soll", "sollen",
-
-    # Misc
-    "auch", "noch", "bereits", "nur", "nicht", "kein",
-    "eines", "einem", "einer", "des", "dem", "den",
-
-    # OCR/document noise
-    "gmbh", "kg", "ag", "mbh", "euro", "eur",
-    "rechnung", "konto", "datum"
-]
 
 def get_file_hash(path: Path) -> str:
     """Erzeugt einen MD5-Hash des Dateiinhalts."""
