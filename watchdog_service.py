@@ -1,6 +1,7 @@
 import time
 import logging
 import importlib.util
+import multiprocessing
 import threading
 import sys
 import ctypes
@@ -34,6 +35,29 @@ def load_rename_script() -> Any:
     return module
 
 rename_script = load_rename_script()
+
+def process_files_worker(files: list, queue: multiprocessing.Queue):
+    """Separater Prozess für die LLM-Verarbeitung zur Isolation von CUDA-Abstürzen."""
+    try:
+        # Re-Importe innerhalb des Kindprozesses für Windows 'spawn'
+        import logging
+        from pathlib import Path
+        import importlib.util
+        from utils.llm_extractor import unload_llm
+        from utils.common import LOG_FILE
+
+        # Rename-Script im Kind-Prozess laden
+        script_path = Path(__file__).parent / "1. rename.py"
+        spec = importlib.util.spec_from_file_location("rename_script", str(script_path))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        model = module.get_model()
+        for i, f in enumerate(files, 1):
+            module.process_file(f, model)
+            queue.put(i)  # Fortschritt an Hauptprozess melden
+    finally:
+        unload_llm()
 
 class WatchdogService:
     def __init__(self) -> None:
@@ -165,13 +189,23 @@ class WatchdogService:
                 self.update_ui(ServiceState.PROCESSING, progress=(0, total_files))
                 
                 try:
-                    get_llm()
-                    model = rename_script.get_model()
-                    for i, f in enumerate(files, 1):
-                        rename_script.process_file(f, model)
-                        self.processed_count += 1
-                        self.update_ui(ServiceState.PROCESSING, progress=(i, total_files))
+                    # Erstelle eine Queue für den Fortschritt und starte den Subprozess
+                    queue = multiprocessing.Queue()
+                    p = multiprocessing.Process(target=process_files_worker, args=(files, queue))
+                    p.start()
+
+                    # Überwache den Prozess, während er läuft
+                    while p.is_alive():
+                        while not queue.empty():
+                            done_count = queue.get()
+                            self.update_ui(ServiceState.PROCESSING, progress=(done_count, total_files))
+                        time.sleep(0.5)
                     
+                    p.join()
+                    if p.exitcode != 0:
+                        raise RuntimeError(f"KI-Prozess abgestürzt (Exitcode {p.exitcode}). Wahrscheinlich CUDA-Fehler.")
+
+                    self.processed_count += total_files
                     self.last_change_time = 0
                     self.update_ui(ServiceState.IDLE)
                 except Exception as e:
@@ -179,8 +213,6 @@ class WatchdogService:
                     self.error_message = str(e)
                     self.error_pause_until = datetime.now() + timedelta(hours=2)
                     self.update_ui(ServiceState.ERROR)
-                finally:
-                    unload_llm()
 
 class InboxHandler(FileSystemEventHandler):
     def __init__(self, service: WatchdogService) -> None:
@@ -201,6 +233,7 @@ def hide_console() -> None:
 
 def start_watchdog() -> None:
     hide_console()
+    multiprocessing.freeze_support() # Wichtig für Windows
     FOLDER_INBOX.mkdir(parents=True, exist_ok=True)
     
     service = WatchdogService()
