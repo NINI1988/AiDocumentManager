@@ -1,14 +1,32 @@
 import time
 import logging
 import importlib.util
+import threading
+import sys
+import ctypes
+from datetime import datetime, timedelta
+from enum import Enum
 from pathlib import Path
+from typing import Optional, Any, Tuple
+
+import pystray
+from PIL import Image, ImageDraw
 from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-from utils.common import FOLDER_INBOX
+from watchdog.events import FileSystemEventHandler, FileSystemEvent
+
+from utils.common import FOLDER_INBOX, FOLDER_REVIEW, FOLDER_UNSURE, LOG_FILE
 from utils.llm_extractor import get_llm, unload_llm
 
-# Dynamischer Import für "1. rename.py" aufgrund des speziellen Dateinamens
-def load_rename_script():
+logging.basicConfig(level=logging.INFO, filename=LOG_FILE, format="%(asctime)s %(message)s")
+
+class ServiceState(Enum):
+    IDLE = "Idle"
+    PROCESSING = "Processing"
+    PAUSED = "Paused"
+    ERROR = "Error Pause (2h)"
+
+# Dynamic import for "1. rename.py"
+def load_rename_script() -> Any:
     script_path = Path(__file__).parent / "1. rename.py"
     spec = importlib.util.spec_from_file_location("rename_script", str(script_path))
     module = importlib.util.module_from_spec(spec)
@@ -17,47 +35,188 @@ def load_rename_script():
 
 rename_script = load_rename_script()
 
-class InboxHandler(FileSystemEventHandler):
-    def on_created(self, event):
-        if not event.is_directory and event.src_path.lower().endswith(".pdf"):
-            file_path = Path(event.src_path)
-            logging.info(f"Neue Datei erkannt: {file_path.name}. Warte auf Sync...")
+class WatchdogService:
+    def __init__(self) -> None:
+        self.state: ServiceState = ServiceState.IDLE
+        self.processed_count: int = 0
+        self.error_message: Optional[str] = None
+        self.error_pause_until: Optional[datetime] = None
+        self.is_paused: bool = False
+        self.running: bool = True
+        self.last_change_time: float = 0.0
+        
+        # Prüfen, ob bereits Dateien vorhanden sind und Timer initialisieren
+        existing_files = list(FOLDER_INBOX.glob("*.pdf"))
+        if existing_files:
+            logging.info(f"Start-Check: {len(existing_files)} vorhandene Dateien gefunden. Stabilitäts-Check läuft...")
+            self.last_change_time = time.time()
+
+        # Initialize Tray Icon
+        self.icon = pystray.Icon("AiDocumentManager", self.generate_icon(ServiceState.IDLE), 
+                                 title="Ai Document Manager: Initialisierung", menu=self.create_menu())
+
+    def generate_icon(self, state: ServiceState) -> Image.Image:
+        # Create a transparent background
+        img = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        
+        # Draw Document Body (Base Icon)
+        d.rectangle([12, 4, 52, 60], fill="white", outline="black", width=2)
+        # Folded corner effect (top right)
+        d.polygon([(40, 4), (52, 4), (52, 16)], fill="lightgray", outline="black")
+        
+        # Draw some lines to represent text on the document
+        for i in range(22, 55, 8):
+            d.line([20, i, 44, i], fill="gray", width=2)
+
+        # Status Overlays in the bottom right corner
+        # Relativ groß gewählt (32x32 auf 64x64 Canvas) für gute Sichtbarkeit
+        overlay_size = 32 
+        overlay_x = 64 - overlay_size 
+        overlay_y = 64 - overlay_size
+
+        if state == ServiceState.PROCESSING:
+            # Blue circle for processing
+            d.ellipse([overlay_x, overlay_y, overlay_x + overlay_size, overlay_y + overlay_size], 
+                      fill=(0, 120, 215), outline="white", width=2)
+            # Static "loading" arc
+            d.arc([overlay_x + 3, overlay_y + 3, overlay_x + overlay_size - 3, overlay_y + overlay_size - 3], 
+                  start=0, end=270, fill="white", width=4)
+        elif state == ServiceState.PAUSED:
+            # Gelbes Quadrat für bessere Sichtbarkeit der Pause
+            d.rectangle([overlay_x, overlay_y, overlay_x + overlay_size, overlay_y + overlay_size], 
+                        fill="yellow", outline="black", width=1)
+            # Schwarze vertikale Balken für maximalen Kontrast
+            bar_width = 6
+            bar_height = 18
+            bar_spacing = 4
+            total_bars_width = (bar_width * 2) + bar_spacing
+            start_x_bars = overlay_x + (overlay_size - total_bars_width) // 2
+            start_y_bars = overlay_y + (overlay_size - bar_height) // 2
+
+            d.rectangle([start_x_bars, start_y_bars, start_x_bars + bar_width, start_y_bars + bar_height], fill="black")
+            d.rectangle([start_x_bars + bar_width + bar_spacing, start_y_bars, start_x_bars + bar_width + bar_spacing + bar_width, start_y_bars + bar_height], fill="black")
+        elif state == ServiceState.ERROR:
+            # Red circle with an X
+            d.ellipse([overlay_x, overlay_y, overlay_x + overlay_size, overlay_y + overlay_size], 
+                      fill="red", outline="white", width=2)
+            d.line([overlay_x + 6, overlay_y + 6, overlay_x + overlay_size - 6, overlay_y + overlay_size - 6], fill="white", width=4)
+            d.line([overlay_x + overlay_size - 6, overlay_y + 6, overlay_x + 6, overlay_y + overlay_size - 6], fill="white", width=4)
             
-            # OneDrive Sync-Verzögerung abwarten
-            time.sleep(3)
+        return img
+
+    def create_menu(self) -> pystray.Menu:
+        return pystray.Menu(
+            pystray.MenuItem(lambda item: "Resume" if self.is_paused else "Pause", self.toggle_pause),
+            pystray.MenuItem("Exit", self.stop_service)
+        )
+
+    def toggle_pause(self) -> None:
+        self.is_paused = not self.is_paused
+        self.update_ui(ServiceState.PAUSED if self.is_paused else ServiceState.IDLE)
+
+    def stop_service(self) -> None:
+        self.running = False
+        self.icon.stop()
+
+    def update_ui(self, state: ServiceState, progress: Optional[Tuple[int, int]] = None) -> None:
+        self.state = state
+        self.icon.icon = self.generate_icon(state)
+        
+        review_files = len(list(FOLDER_REVIEW.rglob("*.pdf")))
+        unsure_files = len(list(FOLDER_UNSURE.rglob("*.pdf")))
+        
+        status_msg = f"Ai Document Manager: {state.value}\n"
+        status_msg += f"Folder: {FOLDER_INBOX.resolve()}\n"
+        
+        stats_text = f"{self.processed_count} total done"
+        if progress:
+            stats_text = f"{progress[0]}/{progress[1]} done (Total: {self.processed_count})"
+        
+        status_msg += f"Stats: {stats_text}, {review_files} review, {unsure_files} unsure"
+        
+        if self.error_message:
+            status_msg += f"\nError: {self.error_message}"
+        
+        self.icon.title = status_msg
+
+    def process_queue(self) -> None:
+        while self.running:
+            time.sleep(1)
+            if self.is_paused: continue
             
-            try:
-                # 1. LLM vorab laden (Singleton sorgt dafür, dass es nur einmal passiert)
-                get_llm()
+            # Check Error Pause
+            if self.error_pause_until:
+                if datetime.now() < self.error_pause_until:
+                    continue
+                else:
+                    self.error_pause_until = None
+                    self.error_message = None
+                    self.update_ui(ServiceState.IDLE)
+
+            # Stability check: 5 seconds since last change
+            if self.last_change_time > 0 and (time.time() - self.last_change_time) > 5:
+                files = list(FOLDER_INBOX.glob("*.pdf"))
+                if not files:
+                    self.last_change_time = 0
+                    continue
+
+                total_files = len(files)
+                self.update_ui(ServiceState.PROCESSING, progress=(0, total_files))
                 
-                # 2. Modelle aus dem Rename-Script beziehen
-                model = rename_script.get_model()
-                
-                # 3. Datei mit der erweiterten Logik verarbeiten
-                rename_script.process_file(file_path, model)
-                
-            finally:
-                # 4. Prüfen, ob noch weitere PDFs in der Inbox warten
-                # (Wir ignorieren die aktuelle Datei, falls MODE=Mode.NO_CHANGE aktiv ist)
-                remaining = [f for f in FOLDER_INBOX.glob("*.pdf") if f.name != file_path.name]
-                if not remaining:
+                try:
+                    get_llm()
+                    model = rename_script.get_model()
+                    for i, f in enumerate(files, 1):
+                        rename_script.process_file(f, model)
+                        self.processed_count += 1
+                        self.update_ui(ServiceState.PROCESSING, progress=(i, total_files))
+                    
+                    self.last_change_time = 0
+                    self.update_ui(ServiceState.IDLE)
+                except Exception as e:
+                    logging.error(f"Watchdog Error: {e}")
+                    self.error_message = str(e)
+                    self.error_pause_until = datetime.now() + timedelta(hours=2)
+                    self.update_ui(ServiceState.ERROR)
+                finally:
                     unload_llm()
 
-def start_watchdog():
-    logging.info(f"Überwachung gestartet für: {FOLDER_INBOX}")
-    event_handler = InboxHandler()
-    observer = Observer()
-    observer.schedule(event_handler, str(FOLDER_INBOX), recursive=False)
-    observer.start()
+class InboxHandler(FileSystemEventHandler):
+    def __init__(self, service: WatchdogService) -> None:
+        self.service = service
+
+    def on_any_event(self, event: FileSystemEvent) -> None:
+        if not event.is_directory and event.src_path.lower().endswith(".pdf"):
+            self.service.last_change_time = time.time()
+
+def hide_console() -> None:
+    """Hides the console window on Windows."""
+    if sys.platform == "win32":
+        kernel32 = ctypes.WinDLL('kernel32')
+        user32 = ctypes.WinDLL('user32')
+        h_wnd = kernel32.GetConsoleWindow()
+        if h_wnd:
+            user32.ShowWindow(h_wnd, 0)
+
+def start_watchdog() -> None:
+    hide_console()
+    FOLDER_INBOX.mkdir(parents=True, exist_ok=True)
     
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
+    service = WatchdogService()
+    handler = InboxHandler(service)
+    observer = Observer()
+    observer.schedule(handler, str(FOLDER_INBOX), recursive=False)
+    observer.start()
+
+    # Start processing thread
+    threading.Thread(target=service.process_queue, daemon=True).start()
+    
+    # Run Icon (Blocks main thread)
+    service.icon.run()
+    
+    observer.stop()
     observer.join()
 
 if __name__ == "__main__":
-    # Sicherstellen, dass die Ordner existieren
-    FOLDER_INBOX.mkdir(parents=True, exist_ok=True)
     start_watchdog()

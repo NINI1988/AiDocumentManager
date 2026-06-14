@@ -1,131 +1,15 @@
-import os
 import logging
-from typing import Optional
-import joblib
 import time
-from pathlib import Path
-import hashlib
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.pipeline import Pipeline
-from sklearn.feature_selection import SelectKBest, chi2
-from tqdm import tqdm
-
-from utils.matchers import normalize_text
-from utils.config import GERMAN_STOP_WORDS
-from utils.common import TRAIN_DATA_PATH, MODEL_PATH, TRAIN_CACHE_PATH, extract_pdf_content
-
-def get_file_hash(path: Path) -> str:
-    """Erzeugt einen MD5-Hash des Dateiinhalts."""
-    hasher = hashlib.md5()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            hasher.update(chunk)
-    return hasher.hexdigest()
-
-def train_model() -> Optional[Pipeline]:
-    """Trainiert das Modell basierend auf der bestehenden Ordnerstruktur."""
-    logging.info(f"Starte Training mit Daten aus: {TRAIN_DATA_PATH}")
-    X, y = [], []
-    
-    all_pdf_files = list(TRAIN_DATA_PATH.rglob("*.pdf"))
-    if not all_pdf_files:
-        logging.warning("Keine Trainings-PDFs gefunden!")
-        return None
-
-    # Cache laden
-    cache = {}
-    if TRAIN_CACHE_PATH.exists():
-        try:
-            cache = joblib.load(TRAIN_CACHE_PATH)
-            logging.info(f"Cache geladen: {len(cache)} Einträge.")
-        except Exception as e:
-            logging.warning(f"Konnte Cache nicht laden: {e}")
-
-    cache_hits = 0
-    
-    for pdf_file in tqdm(all_pdf_files, desc="PDFs verarbeiten", unit="file"):
-        # Label bestimmen: Relativer Pfad bis zu 2 Ebenen
-        rel_path = pdf_file.relative_to(TRAIN_DATA_PATH)
-        parts = rel_path.parts[:-1] # Ohne Dateiname
-        if not parts:
-            continue
-        
-        # label = os.path.join(*parts[:2]) # Max 2 Ebenen
-        label = os.path.join(*parts) # Max 2 Ebenen
-        
-        # Hash berechnen für Cache-Prüfung
-        file_hash = get_file_hash(pdf_file)
-        
-        if file_hash in cache:
-            norm_text = cache[file_hash]
-            cache_hits += 1
-        else:
-            text, _ = extract_pdf_content(pdf_file)
-            norm_text = normalize_text(text) if text else ""
-            # Neuen Text in den persistenten Cache aufnehmen
-            cache[file_hash] = norm_text
-
-        if norm_text and len(norm_text.strip()) > 10:
-            X.append(norm_text)
-            y.append(label)
-            
-    if not X: # Check again after processing, in case all PDFs were empty
-        logging.warning("Keine Trainingsdaten gefunden!")
-        return None
-
-    # Neuen Cache speichern
-    joblib.dump(cache, TRAIN_CACHE_PATH, compress=3)
-    logging.info(f"Verarbeitung abgeschlossen. Cache-Treffer: {cache_hits}, Neu eingelesen: {len(all_pdf_files) - cache_hits}")
-
-    pipeline = Pipeline([
-        ('tfidf', TfidfVectorizer(
-            # analyzer="char_wb",
-            # ngram_range=(3, 5),
-            # # ngram_range=(1, 3), # Jetzt bis zu 3 Wörter (z.B. "Deutsche Rentenversicherung Bund")
-            # # stop_words=GERMAN_STOP_WORDS,
-            # min_df=2,
-            # max_df=0.7,  # Strenger: Wörter, die in >70% der Docs vorkommen, fliegen raus
-            # sublinear_tf=True,  # Dämpft die Häufigkeit (10x "Auto" ist nicht 10x so wichtig wie 1x)
-            
-            
-            analyzer="word",
-            ngram_range=(1, 2),
-            stop_words=GERMAN_STOP_WORDS,
-            min_df=2, # Ignoriere Wörter/Paare, die nur in 1 Dokument vorkommen (reduziert Größe massiv)
-            max_df=0.9,
-            max_features=50000, # Deckelt die Anzahl der Merkmale
-            # sublinear_tf=True,
-            token_pattern=r"(?u)\b[a-zA-Z0-9äöüÄÖÜß]{3,}\b"
-        )),
-        # alpha=1.0 → stark geglättet (robuster, aber weniger präzise)
-        # alpha=0.1 → Standard in vielen Textfällen
-        # alpha=0.01 → sehr wenig Glättung, sehr „aggressiv auf Daten“
-        # alpha=0.0 → nicht empfohlen (instabil)
-        # ('chi2', SelectKBest(chi2, k=5000)),
-        # ('clf', MultinomialNB(alpha=1))
-        ('clf', MultinomialNB(alpha=0.01))
-    ])
-    
-    logging.info(f"Pipeline Fit startet. Anzahl Dokumente: {len(X)}, Anzahl Kategorien: {len(set(y))}")
-    fit_start_time = time.time()
-    pipeline.fit(X, y)
-    fit_end_time = time.time()
-    joblib.dump(pipeline, MODEL_PATH, compress=3)
-    logging.info(f"Modell trainiert und gespeichert: {len(X)} Dokumente, {len(set(y))} Kategorien. Fit-Dauer: {fit_end_time - fit_start_time:.2f} Sekunden.")
-    return pipeline
+from utils.model_utils import train_model, TRAIN_DATA_PATH
 
 if __name__ == "__main__":
-    # Konfiguriere einfaches Konsolen-Logging für das manuelle Training
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     start_time = time.time()
-
     print(f"--- Modell-Training wird gestartet ---")
-    print(f"Quelle: {TRAIN_DATA_PATH}") # Use the local TRAIN_DATA_PATH
-    
+    print(f"Quelle: {TRAIN_DATA_PATH}")
     model = train_model()
     if model:
         end_time = time.time()
-        print(f"--- Training erfolgreich abgeschlossen und Modell gespeichert! Dauer: {end_time - start_time:.2f} Sekunden ---")
+        print(f"--- Training abgeschlossen! Dauer: {end_time - start_time:.2f}s ---")
     else:
-        print("--- Fehler: Training konnte nicht durchgeführt werden (keine Daten?). ---")
+        print("--- Fehler: Training fehlgeschlagen. ---")

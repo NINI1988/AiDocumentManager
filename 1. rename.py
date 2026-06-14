@@ -6,7 +6,7 @@ from pathlib import Path
 from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
-from train_model import train_model
+from utils.model_utils import get_model
 from utils.llm_extractor import extract_metadata_with_llm
 from handlers import HANDLERS
 from utils.matchers import extract_date_from_text, normalize_text
@@ -23,11 +23,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.FileHandler(LOG_FILE, encoding="utf-8"), logging.StreamHandler()]
 )
-
-def get_model() -> Optional[Pipeline]:
-    if MODEL_PATH.exists():
-        return joblib.load(MODEL_PATH)
-    return train_model()
 
 def find_handlers(subfolder: str) -> List[BaseHandler]:
     """Findet alle Handler, die für einen bestimmten Unterordner zuständig sind."""
