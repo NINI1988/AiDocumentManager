@@ -1,4 +1,5 @@
 import logging
+import datetime
 from typing import Optional, List
 import joblib
 from pathlib import Path
@@ -7,6 +8,7 @@ from tqdm import tqdm
 
 from train_model import train_model
 from train_subject_model import predict_subject
+from utils.llm_extractor import extract_metadata_with_llm
 from handlers import HANDLERS
 from utils.matchers import extract_date_from_text, normalize_text
 from utils.common import (
@@ -82,9 +84,26 @@ def process_file(file_path: Path, model: Pipeline, subject_model: Optional[Pipel
         except Exception as e:
             logging.error(f"Fehler bei ML-Betreff-Erkennung: {e}")
 
+    # Neu: LLM-basierte Extraktion (Datum und Betreff)
+    llm_metadata = extract_metadata_with_llm(text)
+    llm_subject = None
+    llm_date = None
+    
+    if llm_metadata:
+        if llm_metadata.get("subject_confidence", 0) > 70:
+            llm_subject = llm_metadata.get("subject")
+            logging.info(f"  LLM-Betreff erkannt: {llm_subject} ({llm_metadata['subject_confidence']}%)")
+        
+        if llm_metadata.get("date_confidence", 0) > 80:
+            try:
+                d_str = llm_metadata.get("date")
+                llm_date = datetime.datetime.strptime(d_str, "%Y.%m.%d").date()
+            except:
+                pass
+
     # 3. Metadaten-Extraktion (Datum, Subfolder, Subject)
-    doc_date = extract_date_from_text(text)
-    final_subject = ml_subject or first_line_subject or "Unbekannt"
+    doc_date = llm_date or extract_date_from_text(text)
+    final_subject = llm_subject or ml_subject or first_line_subject or "Unbekannt"
     final_subfolder = category
     target_base = FOLDER_REVIEW
     reason = None
