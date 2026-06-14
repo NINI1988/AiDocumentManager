@@ -11,3 +11,4 @@ test_documents/
 *.pkl
 log.txt
 train_cache.joblib
+*.log

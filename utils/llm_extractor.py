@@ -2,11 +2,23 @@ import json
 import logging
 import time
 from typing import Optional, Dict, Any
+import llama_cpp
 from llama_cpp import Llama
+from utils.common import FOLDER_PROJECT
+
+def _llama_log_callback(level, message, user_data):
+    """Leitet interne llama.cpp-Meldungen in eine Datei um, um die Konsole sauber zu halten."""
+    log_path = FOLDER_PROJECT / "llama_internal.log"
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(message.decode('utf-8', errors='ignore'))
+
+# WICHTIG: Die Python-Funktion muss in einen C-kompatiblen Callback-Typ eingepackt werden.
+# Wir halten die Referenz global, damit sie nicht vom Garbage Collector entfernt wird.
+_llama_log_callback_ptr = llama_cpp.llama_log_callback(_llama_log_callback)
 
 # Pfad zum Modell aus deiner LM Studio Bibliothek
-MODEL_PATH = r"G:\Programme\LmStudio\lmstudio-community\gemma-4-12B-it-QAT-GGUF\gemma-4-12B-it-QAT-Q4_0.gguf"
-# MODEL_PATH = r"G:\Programme\LmStudio\lmstudio-community\gemma-4-E4B-it-QAT-GGUF\gemma-4-E4B-it-QAT-Q4_0.gguf"
+# MODEL_PATH = r"G:\Programme\LmStudio\lmstudio-community\gemma-4-12B-it-QAT-GGUF\gemma-4-12B-it-QAT-Q4_0.gguf"
+MODEL_PATH = r"G:\Programme\LmStudio\lmstudio-community\gemma-4-E4B-it-QAT-GGUF\gemma-4-E4B-it-QAT-Q4_0.gguf"
 # MODEL_PATH = r"G:/Programme/LmStudio/Qwen/Qwen2.5-3B-Instruct-GGUF/qwen2.5-3b-instruct-q4_k_m.gguf"
 
 _llm_instance = None
@@ -21,13 +33,26 @@ def get_llm():
             return None
         try:
             logging.info(f"Initialisiere lokales LLM: {MODEL_PATH}")
+            
+            # WICHTIG: Den Logger global setzen, bevor die Instanz erstellt wird.
+            # Das fängt CUDA-Initialisierungsmeldungen besser ab.
+            llama_cpp.llama_log_set(_llama_log_callback_ptr, None)
+
             _llm_instance = Llama(
                 model_path=MODEL_PATH,
                 n_ctx=4096,
-                n_gpu_layers=-1,  # Erzwingt ALLE Layer in die GPU
-                verbose=False,      # Wichtig für Fehlerdiagnose (CUDA/BLAS)
-                n_threads=6       # Nutzt CPU-Threads nur für das Laden/Handling
+                n_gpu_layers=-1,    # Lädt ALLE 42 Layer auf die GPU (befreit deinen RAM)
+                verbose=True,       # Muss True sein beim Laden, um Windows-Redirect-Crash zu vermeiden
+                n_threads=10,      # Nutzt CPU-Threads nur für das Laden/Handling
+                n_batch=2048,       # Erhöht die Geschwindigkeit beim "Lesen" des Dokuments massiv
+                flash_attn=True,   # Beschleunigt die Verarbeitung langer Prompts deutlich
+                offload_kqv=True   # Zwingt den KV-Cache explizit in den VRAM
             )
+            
+            # JETZT verbose auf False setzen. Das Laden ist fertig (kein Crash mehr möglich),
+            # aber wir unterdrücken so die Performance-Timings bei jeder Abfrage.
+            _llm_instance.verbose = False
+            
         except Exception as e:
             logging.error(f"Fehler beim Laden des LLM-Modells: {e}")
     return _llm_instance
@@ -45,16 +70,16 @@ def extract_metadata_with_llm(text: str) -> Optional[Dict[str, Any]]:
     """
     Nutzt das lokale LLM via llama-cpp-python zur Extraktion von Datum und Betreff.
     """
+    # Stelle sicher, dass das LLM geladen ist, bevor wir die Zeit messen (fairer Vergleich zu LM Studio)
     llm = get_llm()
     if not llm:
         return None
 
+    started = time.perf_counter()
     system_prompt = """You are a document extraction engine.
-
 Extract:
 - date (YYYY.MM.DD)
 - subject (short title)
-- confidence for date and subject
 
 Rules:
 - Use ONLY information from the document.
@@ -67,26 +92,23 @@ Structured Output:
   "properties": {
     "date": { "type": "string", "description": "Format YYYY.MM.DD" },
     "subject": { "type": "string" },
-    "date_confidence": { "type": "number", "minimum": 0, "maximum": 130 },
-    "subject_confidence": { "type": "number", "minimum": 0, "maximum": 100 }
   },
-  "required": ["date", "subject", "date_confidence", "subject_confidence"]
+  "required": ["date", "subject"]
 }"""
 
     # Wir nehmen nur den Anfang des Dokuments für die Metadaten
     doc_content = text[:4000]
 
     try:
-        started = time.perf_counter()
         logging.info("Starte LLM-Extraktion fuer Dokumentmetadaten...")
         response = llm.create_chat_completion(
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Document content:\n\n{doc_content}"}
+                {"role": "user", "content": f"{doc_content}"}
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=300
+            max_tokens=160
         )
         
         content = response["choices"][0]["message"]["content"]
@@ -95,7 +117,7 @@ Structured Output:
         result = json.loads(content)
         
         # Validierung der Pflichtfelder
-        if all(k in result for k in ["date", "subject", "date_confidence", "subject_confidence"]):
+        if all(k in result for k in ["date", "subject"]):
             return result
             
     except Exception as e:

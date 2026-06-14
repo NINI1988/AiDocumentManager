@@ -90,15 +90,15 @@ def process_file(file_path: Path, model: Pipeline, subject_model: Optional[Pipel
     llm_date = None
     
     if llm_metadata:
-        if llm_metadata.get("subject_confidence", 0) > 70:
-            llm_subject = llm_metadata.get("subject")
-            logging.info(f"  LLM-Betreff erkannt: {llm_subject} ({llm_metadata['subject_confidence']}%)")
-        
-        if llm_metadata.get("date_confidence", 0) > 80:
+        llm_subject = llm_metadata.get("subject")
+        if llm_subject:
+            logging.info(f"  LLM-Betreff erkannt: {llm_subject}")
+
+        d_str = llm_metadata.get("date")
+        if d_str:
             try:
-                d_str = llm_metadata.get("date")
                 llm_date = datetime.datetime.strptime(d_str, "%Y.%m.%d").date()
-            except:
+            except Exception:
                 pass
 
     # 3. Metadaten-Extraktion (Datum, Subfolder, Subject)
@@ -171,4 +171,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    wait_if_not_debugging()
+    # wait_if_not_debugging()
