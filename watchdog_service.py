@@ -36,7 +36,7 @@ def load_rename_script() -> Any:
 
 rename_script = load_rename_script()
 
-def process_files_worker(files: list, queue: multiprocessing.Queue):
+def process_files_worker(files: list, queue: multiprocessing.Queue, stop_event: multiprocessing.Event):
     """Separater Prozess für die LLM-Verarbeitung zur Isolation von CUDA-Abstürzen."""
     try:
         # Re-Importe innerhalb des Kindprozesses für Windows 'spawn'
@@ -54,6 +54,8 @@ def process_files_worker(files: list, queue: multiprocessing.Queue):
 
         model = module.get_model()
         for i, f in enumerate(files, 1):
+            if stop_event.is_set():
+                break
             module.process_file(f, model)
             queue.put(i)  # Fortschritt an Hauptprozess melden
     finally:
@@ -68,16 +70,20 @@ class WatchdogService:
         self.is_paused: bool = False
         self.running: bool = True
         self.last_change_time: float = 0.0
+        self.stop_event = multiprocessing.Event()
         
         # Prüfen, ob bereits Dateien vorhanden sind und Timer initialisieren
         existing_files = list(FOLDER_INBOX.glob("*.pdf"))
         if existing_files:
-            logging.info(f"Start-Check: {len(existing_files)} vorhandene Dateien gefunden. Stabilitäts-Check läuft...")
+            # Timer auf aktuelle Zeit setzen für 5s Wartezeit (Stabilitätscheck)
             self.last_change_time = time.time()
+            logging.info(f"Start-Check: {len(existing_files)} Dateien gefunden. Warte auf Stabilität...")
 
         # Initialize Tray Icon
         self.icon = pystray.Icon("AiDocumentManager", self.generate_icon(ServiceState.IDLE), 
-                                 title="Ai Document Manager: Initialisierung", menu=self.create_menu())
+                                 title="Ai Document Manager", menu=self.create_menu())
+        # Sofortiger UI-Refresh basierend auf dem Initial-Status
+        self.update_ui(ServiceState.IDLE)
 
     def generate_icon(self, state: ServiceState) -> Image.Image:
         # Create a transparent background
@@ -137,16 +143,25 @@ class WatchdogService:
 
     def toggle_pause(self) -> None:
         self.is_paused = not self.is_paused
+        if self.is_paused:
+            self.stop_event.set()  # Signal an Worker: Nach aktueller Datei stoppen
+        else:
+            self.stop_event.clear() # Signal zurücksetzen für nächsten Lauf
+            # Falls Dateien warten, Stabilitäts-Timer erneut starten
+            if list(FOLDER_INBOX.glob("*.pdf")):
+                self.last_change_time = time.time()
         self.update_ui(ServiceState.PAUSED if self.is_paused else ServiceState.IDLE)
 
     def stop_service(self) -> None:
         self.running = False
+        self.stop_event.set()  # Signal an Worker: Sofort nach der aktuellen Datei aufhören
         self.icon.stop()
 
     def update_ui(self, state: ServiceState, progress: Optional[Tuple[int, int]] = None) -> None:
         self.state = state
         self.icon.icon = self.generate_icon(state)
         
+        inbox_files = len(list(FOLDER_INBOX.glob("*.pdf")))
         review_files = len(list(FOLDER_REVIEW.rglob("*.pdf")))
         unsure_files = len(list(FOLDER_UNSURE.rglob("*.pdf")))
         
@@ -157,7 +172,7 @@ class WatchdogService:
         if progress:
             stats_text = f"{progress[0]}/{progress[1]} done (Total: {self.processed_count})"
         
-        status_msg += f"Stats: {stats_text}, {review_files} review, {unsure_files} unsure"
+        status_msg += f"Stats: {stats_text}, {inbox_files} inbox, {review_files} review, {unsure_files} unsure"
         
         if self.error_message:
             status_msg += f"\nError: {self.error_message}"
@@ -186,28 +201,36 @@ class WatchdogService:
                     continue
 
                 total_files = len(files)
-                self.update_ui(ServiceState.PROCESSING, progress=(0, total_files))
+                last_done = 0
+                if not self.is_paused:
+                    self.update_ui(ServiceState.PROCESSING, progress=(0, total_files))
                 
                 try:
+                    self.stop_event.clear()
                     # Erstelle eine Queue für den Fortschritt und starte den Subprozess
                     queue = multiprocessing.Queue()
-                    p = multiprocessing.Process(target=process_files_worker, args=(files, queue))
+                    p = multiprocessing.Process(target=process_files_worker, args=(files, queue, self.stop_event))
                     p.start()
 
                     # Überwache den Prozess, während er läuft
                     while p.is_alive():
                         while not queue.empty():
-                            done_count = queue.get()
-                            self.update_ui(ServiceState.PROCESSING, progress=(done_count, total_files))
+                            last_done = queue.get()
+                            # UI nur aktualisieren, wenn wir nicht gerade auf Pause geklickt haben
+                            if not self.is_paused:
+                                self.update_ui(ServiceState.PROCESSING, progress=(last_done, total_files))
                         time.sleep(0.5)
                     
                     p.join()
-                    if p.exitcode != 0:
+                    
+                    # Exitcode 0 ist normaler Exit, alles andere (wenn nicht manuell gestoppt) ist ein Crash
+                    if p.exitcode != 0 and not self.stop_event.is_set():
                         raise RuntimeError(f"KI-Prozess abgestürzt (Exitcode {p.exitcode}). Wahrscheinlich CUDA-Fehler.")
 
-                    self.processed_count += total_files
+                    self.processed_count += last_done
                     self.last_change_time = 0
-                    self.update_ui(ServiceState.IDLE)
+                    if not self.is_paused:
+                        self.update_ui(ServiceState.IDLE)
                 except Exception as e:
                     logging.error(f"Watchdog Error: {e}")
                     self.error_message = str(e)
@@ -221,6 +244,8 @@ class InboxHandler(FileSystemEventHandler):
     def on_any_event(self, event: FileSystemEvent) -> None:
         if not event.is_directory and event.src_path.lower().endswith(".pdf"):
             self.service.last_change_time = time.time()
+            # Tooltip sofort aktualisieren, um neue Datei in Inbox anzuzeigen
+            self.service.update_ui(self.service.state)
 
 def hide_console() -> None:
     """Hides the console window on Windows."""
