@@ -32,10 +32,9 @@ class InboxHandler(FileSystemEventHandler):
                 
                 # 2. Modelle aus dem Rename-Script beziehen
                 model = rename_script.get_model()
-                subject_model = rename_script.get_subject_model()
                 
                 # 3. Datei mit der erweiterten Logik verarbeiten
-                rename_script.process_file(file_path, model, subject_model)
+                rename_script.process_file(file_path, model)
                 
             finally:
                 # 4. Prüfen, ob noch weitere PDFs in der Inbox warten
