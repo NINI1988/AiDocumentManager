@@ -15,7 +15,12 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from utils.config import FOLDER_INBOX, FOLDER_REVIEW, FOLDER_UNSURE, LOG_FILE
 from utils.config import ERROR_PAUSE_SECONDS
 # Sets the logging level to DEBUG to get more detailed information
-logging.basicConfig(level=logging.INFO, filename=LOG_FILE, format="%(asctime)s %(message)s")
+logging.basicConfig(
+    level=logging.INFO, 
+    filename=LOG_FILE, 
+    format="%(asctime)s %(message)s",
+    encoding="utf-8"  # Forces UTF-8 encoding for the log file
+)
 
 class ServiceState(Enum):
     IDLE = "Idle"
@@ -28,6 +33,14 @@ def process_files_worker(files: list, queue: multiprocessing.Queue, error_queue:
     try:
         # Re-Importe innerhalb des Kindprozesses für Windows 'spawn'
         import logging
+        from utils.config import LOG_FILE
+        # Re-configure logging in the child process to use the same file and encoding
+        logging.basicConfig(
+            level=logging.INFO,
+            filename=LOG_FILE,
+            format="%(asctime)s [Worker] %(message)s",
+            encoding="utf-8"
+        )
         from utils.llm_extractor import get_llm, unload_llm
         from utils.processor import process_file
 
