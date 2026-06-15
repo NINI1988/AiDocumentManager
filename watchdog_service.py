@@ -1,24 +1,20 @@
 import time
 import logging
-import importlib.util
 import multiprocessing
 import threading
 import sys
-import ctypes
 from datetime import datetime, timedelta
 from enum import Enum
-from pathlib import Path
-from typing import Optional, Any, Tuple
+from typing import Optional, Tuple
 
 import pystray
 from PIL import Image, ImageDraw
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
-from utils.common import FOLDER_INBOX, FOLDER_REVIEW, FOLDER_UNSURE, LOG_FILE
+from utils.config import FOLDER_INBOX, FOLDER_REVIEW, FOLDER_UNSURE, LOG_FILE
 from utils.config import ERROR_PAUSE_SECONDS
-from utils.llm_extractor import get_llm, unload_llm
-# Setzt das Logging-Level auf DEBUG, um detailliertere Informationen zu erhalten
+# Sets the logging level to DEBUG to get more detailed information
 logging.basicConfig(level=logging.INFO, filename=LOG_FILE, format="%(asctime)s %(message)s")
 
 class ServiceState(Enum):
@@ -27,38 +23,20 @@ class ServiceState(Enum):
     PAUSED = "Paused"
     ERROR = "Error Pause"
 
-# Dynamic import for "1. rename.py"
-def load_rename_script() -> Any:
-    script_path = Path(__file__).parent / "1. rename.py"
-    spec = importlib.util.spec_from_file_location("rename_script", str(script_path))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-rename_script = load_rename_script()
-
 def process_files_worker(files: list, queue: multiprocessing.Queue, error_queue: multiprocessing.Queue, stop_event: multiprocessing.Event):
-    """Separater Prozess für die LLM-Verarbeitung zur Isolation von CUDA-Abstürzen."""
+    """Separate process for LLM processing to isolate CUDA crashes."""
     try:
         # Re-Importe innerhalb des Kindprozesses für Windows 'spawn'
         import logging
-        from pathlib import Path
-        import importlib.util
-        from utils.llm_extractor import unload_llm
-        from utils.common import LOG_FILE
-
-        # Rename-Script im Kind-Prozess laden
-        script_path = Path(__file__).parent / "1. rename.py"
-        spec = importlib.util.spec_from_file_location("rename_script", str(script_path))
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        from utils.llm_extractor import get_llm, unload_llm
+        from utils.processor import process_file
 
         try:
-            model = module.get_model()
+            get_llm()  # Pre-load LLM to initialize CUDA/GPU memory before processing
             for i, f in enumerate(files, 1):
                 if stop_event.is_set():
                     break
-                module.process_file(f, model)
+                process_file(f)
                 queue.put(i)  # Fortschritt an Hauptprozess melden
         except Exception as e:
             error_queue.put(str(e))
@@ -77,20 +55,20 @@ class WatchdogService:
         self.last_change_time: float = 0.0
         self.stop_event = multiprocessing.Event()
         
-        # Prüfen, ob bereits Dateien vorhanden sind und Timer initialisieren
+        # Check if files already exist and initialize timer
         existing_files = list(FOLDER_INBOX.glob("*.pdf"))
         if existing_files:
-            # Timer auf aktuelle Zeit setzen für 5s Wartezeit (Stabilitätscheck)
+            # Set timer to current time for 5s wait (stability check)
             self.last_change_time = time.time()
-            logging.info(f"Start-Check: {len(existing_files)} Dateien gefunden. Warte auf Stabilität...")
+            logging.info(f"Startup check: {len(existing_files)} files found. Waiting for stability...")
 
         # Initialize Tray Icon
-        self.icon = pystray.Icon("AiDocumentManager", self.generate_icon(ServiceState.IDLE), 
+        self.icon = pystray.Icon("AiDocumentManager", self.generate_icon(ServiceState.IDLE),
                                  title="Ai Document Manager", menu=self.create_menu())
-        # Sofortiger UI-Refresh basierend auf dem Initial-Status
+        # Immediate UI refresh based on initial status
         self.update_ui(ServiceState.IDLE)
 
-    def generate_icon(self, state: ServiceState) -> Image.Image:
+    def generate_icon(self, state: ServiceState) -> Image.Image: # Immediate UI refresh based on initial status
         # Create a transparent background
         img = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
@@ -104,24 +82,24 @@ class WatchdogService:
         for i in range(22, 55, 8):
             d.line([20, i, 44, i], fill="gray", width=2)
 
-        # Status Overlays in the bottom right corner
-        # Relativ groß gewählt (32x32 auf 64x64 Canvas) für gute Sichtbarkeit
+        # Status Overlays in the bottom right corner # Relatively large (32x32 on 64x64 canvas) for good visibility
+        # Relatively large (32x32 on 64x64 canvas) for good visibility
         overlay_size = 32 
         overlay_x = 64 - overlay_size 
         overlay_y = 64 - overlay_size
 
         if state == ServiceState.PROCESSING:
-            # Blue circle for processing
+            # Blue circle for processing # Static "loading" arc
             d.ellipse([overlay_x, overlay_y, overlay_x + overlay_size, overlay_y + overlay_size], 
                       fill=(0, 120, 215), outline="white", width=2)
-            # Static "loading" arc
+            # Static "loading" arc # Yellow square for better visibility of the pause
             d.arc([overlay_x + 3, overlay_y + 3, overlay_x + overlay_size - 3, overlay_y + overlay_size - 3], 
                   start=0, end=270, fill="white", width=4)
         elif state == ServiceState.PAUSED:
-            # Gelbes Quadrat für bessere Sichtbarkeit der Pause
+            # Yellow square for better visibility of the pause # Black vertical bars for maximum contrast
             d.rectangle([overlay_x, overlay_y, overlay_x + overlay_size, overlay_y + overlay_size], 
                         fill="yellow", outline="black", width=1)
-            # Schwarze vertikale Balken für maximalen Kontrast
+            # Black vertical bars for maximum contrast # Red circle with an X
             bar_width = 6
             bar_height = 18
             bar_spacing = 4
@@ -132,7 +110,7 @@ class WatchdogService:
             d.rectangle([start_x_bars, start_y_bars, start_x_bars + bar_width, start_y_bars + bar_height], fill="black")
             d.rectangle([start_x_bars + bar_width + bar_spacing, start_y_bars, start_x_bars + bar_width + bar_spacing + bar_width, start_y_bars + bar_height], fill="black")
         elif state == ServiceState.ERROR:
-            # Red circle with an X
+            # Red circle with an X # Give UI a moment to update
             d.ellipse([overlay_x, overlay_y, overlay_x + overlay_size, overlay_y + overlay_size], 
                       fill="red", outline="white", width=2)
             d.line([overlay_x + 6, overlay_y + 6, overlay_x + overlay_size - 6, overlay_y + overlay_size - 6], fill="white", width=4)
@@ -148,7 +126,7 @@ class WatchdogService:
 
     def toggle_pause(self) -> None:
         if self.error_pause_until:
-            # Spezialfall: Direktes Resume aus dem Fehlerzustand
+            # Special case: Direct resume from error state
             self.error_pause_until = None
             self.error_message = None
             self.is_paused = False
@@ -156,13 +134,12 @@ class WatchdogService:
             logging.info("Manual resume from error state.")
         else:
             self.is_paused = not self.is_paused
-
         if self.is_paused:
             logging.info("Service paused.")
-            self.stop_event.set()  # Signal an Worker: Nach aktueller Datei stoppen
+            self.stop_event.set()  # Signal to worker: Stop after current file
         else:
-            self.stop_event.clear() # Signal zurücksetzen für nächsten Lauf
-            # Falls Dateien warten, Stabilitäts-Timer erneut starten
+            self.stop_event.clear() # Reset signal for next run
+            # If files are waiting, restart stability timer
             if list(FOLDER_INBOX.glob("*.pdf")):
                 self.last_change_time = time.time()
                 logging.info("Stability timer reset on manual resume (files in inbox).")
@@ -170,7 +147,7 @@ class WatchdogService:
         self.update_ui(ServiceState.PAUSED if self.is_paused else ServiceState.IDLE)
     def stop_service(self) -> None:
         self.running = False
-        self.stop_event.set()  # Signal an Worker: Sofort nach der aktuellen Datei aufhören
+        self.stop_event.set()  # Signal to worker: Stop immediately after the current file
         self.icon.stop()
 
     def update_ui(self, state: ServiceState, progress: Optional[Tuple[int, int]] = None) -> None:
@@ -181,38 +158,38 @@ class WatchdogService:
         review_files = len(list(FOLDER_REVIEW.rglob("*.pdf")))
         unsure_files = len(list(FOLDER_UNSURE.rglob("*.pdf")))
 
-        # Zeile 1: Status & Timer
+        # Line 1: Status & Timer
         status_text = state.value
         if state == ServiceState.ERROR and self.error_pause_until:
             remaining = self.error_pause_until - datetime.now()
             secs = max(0, int(remaining.total_seconds()))
             status_text += f" ({secs}s)"
         line1 = f"Ai Doc Manager: {status_text}"
-
-        # Zeile 2: Progress, Review und Unsure (Komplett sichtbar)
+        # Line 2: Progress, Review and Unsure (Fully visible)
+        # Line 2: Progress, Review and Unsure (Fully visible)
         if progress:
             progress_text = f"{progress[0]}/{progress[1]} files"
         else:
             progress_text = f"{inbox_files} files"
         line2 = f"{progress_text} | Review: {review_files} | Unsure: {unsure_files}"
 
-        # Zeile 3: Kompletter Pfad
+        # Line 3: Full path
         line3 = f"Folder: {FOLDER_INBOX}"
 
-        # Kombinieren und Windows-Limit (128 Zeichen) beachten
+        # Combine and observe Windows limit (128 characters)
         full_msg = f"{line1}\n{line2}\n{line3}"
         if len(full_msg) > 127:
-            # Falls der Pfad extrem lang ist, kürzen wir nur die Pfad-Zeile
+            # If the path is extremely long, we only shorten the path line
             available = 127 - len(line1) - len(line2) - 10
             if available > 10:
                 line3 = line3[:available] + "..."
             full_msg = f"{line1}\n{line2}\n{line3}"
 
-        # Letzte Absicherung gegen ValueError
+        # Last safeguard against ValueError
         self.icon.title = full_msg[:127]
 
-        # Menü NUR aktualisieren, wenn sich der Status geändert hat
-        # Das verhindert das Verschwinden von Einträgen bei sekündlichen Updates
+        # ONLY update menu if status has changed # This prevents entries from disappearing with second-by-second updates
+        # This prevents entries from disappearing with second-by-second updates
         if state != self.state:
             self.icon.menu = self.create_menu()
         
@@ -223,12 +200,11 @@ class WatchdogService:
             time.sleep(1)
             logging.debug(f"Process queue loop: is_paused={self.is_paused}, error_pause_until={self.error_pause_until}, last_change_time={self.last_change_time}")
             if self.is_paused: continue
-            
             # Check Error Pause
             if self.error_pause_until:
                 logging.debug("In error pause state.")
                 if datetime.now() < self.error_pause_until:
-                    # UI aktualisieren für den Countdown im Tooltip
+                    # Update UI for the countdown in the tooltip
                     self.update_ui(ServiceState.ERROR)
                     continue
                 else:
@@ -239,7 +215,7 @@ class WatchdogService:
                     self.update_ui(ServiceState.IDLE)
 
             # Stability check: 5 seconds since last change
-            logging.debug(f"Stability check: time.time() - self.last_change_time = {time.time() - self.last_change_time}")
+            logging.debug(f"Stability check: time.time() - self.last_change_time = {time.time() - self.last_change_time}") # Stability check: 5 seconds since last change
             if self.last_change_time > 0 and (time.time() - self.last_change_time) > 5:
                 files = list(FOLDER_INBOX.glob("*.pdf"))
                 logging.debug(f"Stability check passed. Files in inbox: {len(files)}")
@@ -252,27 +228,25 @@ class WatchdogService:
                 if not self.is_paused:
                     logging.info(f"Starting processing of {total_files} files.")
                     self.update_ui(ServiceState.PROCESSING, progress=(0, total_files))
-                
+                # Create a queue for progress and start the subprocess
                 try:
                     self.stop_event.clear()
-                    # Erstelle eine Queue für den Fortschritt und starte den Subprozess
+                    # Create a queue for progress and start the subprocess
                     queue = multiprocessing.Queue()
                     error_queue = multiprocessing.Queue()
                     p = multiprocessing.Process(target=process_files_worker, args=(files, queue, error_queue, self.stop_event))
                     p.start()
-
-                    # Überwache den Prozess, während er läuft
+                    # Monitor the process while it is running
                     while p.is_alive():
                         while not queue.empty():
                             last_done = queue.get()
-                            # UI nur aktualisieren, wenn wir nicht gerade auf Pause geklickt haben
+                            # Only update UI if we haven't just clicked pause
                             if not self.is_paused:
                                 self.update_ui(ServiceState.PROCESSING, progress=(last_done, total_files))
                         time.sleep(0.5)
-                    
                     p.join()
                     
-                    # Exitcode 0 ist normaler Exit, alles andere (wenn nicht manuell gestoppt) ist ein Crash
+                    # Exit code 0 is a normal exit, everything else (if not manually stopped) is a crash
                     if p.exitcode != 0 and not self.stop_event.is_set():
                         subprocess_err = None
                         if not error_queue.empty():
@@ -290,7 +264,7 @@ class WatchdogService:
                     self.error_message = str(e)
                     self.error_pause_until = datetime.now() + timedelta(seconds=ERROR_PAUSE_SECONDS)
                     self.update_ui(ServiceState.ERROR)
-                    time.sleep(0.1) # Give UI a moment to update
+                    time.sleep(0.1)
 
 class InboxHandler(FileSystemEventHandler):
     def __init__(self, service: WatchdogService) -> None:
@@ -304,7 +278,7 @@ class InboxHandler(FileSystemEventHandler):
 
 
 def start_watchdog() -> None:
-    multiprocessing.freeze_support() # Wichtig für Windows
+    multiprocessing.freeze_support() # Important for Windows
     FOLDER_INBOX.mkdir(parents=True, exist_ok=True)
     
     service = WatchdogService()
@@ -312,11 +286,10 @@ def start_watchdog() -> None:
     observer = Observer()
     observer.schedule(handler, str(FOLDER_INBOX), recursive=False)
     observer.start()
-
     # Start processing thread
+    # Run Icon (Blocks main thread)
     threading.Thread(target=service.process_queue, daemon=True).start()
     
-    # Run Icon (Blocks main thread)
     service.icon.run()
     
     observer.stop()

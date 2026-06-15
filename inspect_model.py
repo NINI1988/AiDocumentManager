@@ -1,41 +1,42 @@
 import joblib
 import pandas as pd
-from utils.common import MODEL_PATH, wait_if_not_debugging
+from utils.common import wait_if_not_debugging
+from utils.config import MODEL_PATH
 
 def inspect():
     if not MODEL_PATH.exists():
-        print(f"Modell nicht gefunden unter {MODEL_PATH}. Bitte zuerst train_model.py ausführen.")
+        print(f"Model not found at {MODEL_PATH}. Please run train_model.py first.")
         return
 
-    # Modell laden
+    # Load model
     pipeline = joblib.load(MODEL_PATH)
     
-    # Komponenten aus der Pipeline extrahieren
+    # Extract components from the pipeline
     vectorizer = pipeline.named_steps['tfidf']
     selector = pipeline.named_steps.get('chi2')
     classifier = pipeline.named_steps['clf']
     
-    # Kategorien (Labels)
+    # Categories (Labels)
     classes = classifier.classes_
-    # Wörter (Features)
+    # Words (Features)
     feature_names = vectorizer.get_feature_names_out()
 
-    # Falls ein Feature-Selector verwendet wurde, müssen die Namen gefiltert werden
+    # If a feature selector was used, the names must be filtered
     if selector:
         feature_names = feature_names[selector.get_support()]
 
-    print(f"--- Modell-Analyse ---")
-    print(f"Gefundene Kategorien: {len(classes)}")
-    print(f"Vokabular-Größe (genutzt): {len(feature_names)} Wörter")
+    print(f"--- Model Analysis ---")
+    print(f"Found Categories: {len(classes)}")
+    print(f"Vocabulary Size (used): {len(feature_names)} words")
     print("-" * 30)
 
-    # Die wichtigsten Wörter pro Kategorie finden
+    # Find the most important words per category
     for i, category in enumerate(classes[:20]):
-        # Die Log-Wahrscheinlichkeiten für diese Klasse abrufen
-        # (Bei MultinomialNB sind das die Koeffizienten)
+        # Retrieve the log probabilities for this class
+        # (For MultinomialNB, these are the coefficients)
         probs = classifier.feature_log_prob_[i]
         
-        # Top 10 Wörter für diese Kategorie sortieren
+        # Sort top 10 words for this category
         top_indices = probs.argsort()[-10:][::-1]
         top_features = [feature_names[j] for j in top_indices]
         

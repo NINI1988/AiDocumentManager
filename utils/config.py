@@ -13,15 +13,15 @@ class Mode(Enum):
 FOLDER_PROJECT = Path(__file__).resolve().parents[1]
 
 # Global setting for file operation mode (used in 1. rename.py)
-# MODE = Mode.NO_CHANGE
-# FOLDER_INBOX = FOLDER_PROJECT / "1. Inbox"
-# FOLDER_REVIEW = FOLDER_PROJECT / "3. Review"
-# FOLDER_UNSURE = FOLDER_PROJECT / "2. Unsure"
+MODE = Mode.NO_CHANGE
+FOLDER_INBOX = FOLDER_PROJECT / "1. Inbox"
+FOLDER_REVIEW = FOLDER_PROJECT / "3. Review"
+FOLDER_UNSURE = FOLDER_PROJECT / "2. Unsure"
 
-MODE = Mode.MOVE
-FOLDER_INBOX = Path(r"G:\OneDrive\ScanTest")
-FOLDER_REVIEW = FOLDER_INBOX / "Review"
-FOLDER_UNSURE = FOLDER_INBOX / "Unsure"
+# MODE = Mode.MOVE
+# FOLDER_INBOX = Path(r"G:\OneDrive\ScanTest")
+# FOLDER_REVIEW = FOLDER_INBOX / "Review"
+# FOLDER_UNSURE = FOLDER_INBOX / "Unsure"
 
 TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "alleDokumente"
 MODEL_PATH = FOLDER_PROJECT / "classifier_model_word.pkl"
@@ -29,7 +29,7 @@ TRAIN_CACHE_PATH = FOLDER_PROJECT / "train_cache.joblib"
 LOG_FILE = FOLDER_PROJECT / "log.txt"
 
 # Minimum confidence for auto-classification
-SUBFOLDER_THRESHOLD = 0.75
+UNSURE_THRESHOLD = 0.75
 
 # Pause duration after an error (e.g. CUDA crash) in seconds
 ERROR_PAUSE_SECONDS = 7200
@@ -44,7 +44,7 @@ LLM_MODEL_PATH = r"G:\Programme\LmStudio\lmstudio-community\gemma-4-E4B-it-QAT-G
 
 
 
-# Einfache Liste deutscher Stop-Words zur Verbesserung der Trennschärfe
+# Simple list of German stop words to improve selectivity
 GERMAN_STOP_WORDS = [
     # Articles
     "der", "die", "das", "ein", "eine", "einer", "einem", "einen",

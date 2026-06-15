@@ -1,23 +1,19 @@
-import re
-from typing import Optional, List
-from pathlib import Path
-from utils.common import BaseHandler, HandlerResult
-from utils.matchers import fuzzy_contains, fuzzy_extract_month_year
+from utils.common import BaseHandler, ProcessingContext
 
 
 class DekaBankHandler(BaseHandler):
-    def get_subfolders(self) -> List[str]:
-        return ["Versicherungen\\Investmentfonds Riester - Deka"]
+    SUBFOLDER = "Versicherungen\\Investmentfonds Riester - Deka"
 
-    def handle(self, text: str, path: Path) -> Optional[HandlerResult]:
-        # if not fuzzy_contains(text, "DekaBank", threshold=0.95):
-        #     return None
+    def handle(self, context: ProcessingContext) -> None:
+        if context.subfolder != self.SUBFOLDER:
+            return
         
+        text = context.text
         if "ERTRAGSAUSSCHÜTTUNG" in text:
             subj = "Ertragsausschüttung"
         elif "Quartalsbericht" in text:
             subj = "Quartalsbericht"
         else:
-            return None
+            return
 
-        return HandlerResult(subject=subj, date=None, subfolder="Versicherungen\\Investmentfonds Riester - Deka")
+        context.subject = subj

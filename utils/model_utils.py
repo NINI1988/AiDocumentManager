@@ -15,39 +15,48 @@ from utils.config import GERMAN_STOP_WORDS, MODEL_PATH, TRAIN_DATA_PATH, TRAIN_C
 from utils.common import extract_pdf_content
 
 def get_file_hash(path: Path) -> str:
-    """Erzeugt einen MD5-Hash des Dateiinhalts."""
+    """Generates an MD5 hash of the file content."""
     hasher = hashlib.md5()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
 
+_cached_model: Optional[Pipeline] = None
+
 def get_model() -> Optional[Pipeline]:
-    """Lädt das Modell oder trainiert es neu, falls nicht vorhanden."""
+    """Loads the model or retrains it if not present (Singleton)."""
+    global _cached_model
+    if _cached_model is not None:
+        return _cached_model
+
     if MODEL_PATH.exists():
         try:
-            return joblib.load(MODEL_PATH)
+            _cached_model = joblib.load(MODEL_PATH)
+            return _cached_model
         except Exception as e:
-            logging.error(f"Fehler beim Laden des Modells: {e}")
-    return train_model()
+            logging.error(f"Error loading the model: {e}")
+    
+    _cached_model = train_model()
+    return _cached_model
 
 def train_model() -> Optional[Pipeline]:
-    """Trainiert das Modell basierend auf der bestehenden Ordnerstruktur."""
-    logging.info(f"Starte Training mit Daten aus: {TRAIN_DATA_PATH}")
+    """Trains the model based on the existing folder structure."""
+    logging.info(f"Starting training with data from: {TRAIN_DATA_PATH}")
     X, y = [], []
     
     all_pdf_files = list(TRAIN_DATA_PATH.rglob("*.pdf"))
     if not all_pdf_files:
-        logging.warning("Keine Trainings-PDFs gefunden!")
+        logging.warning("No training PDFs found!")
         return None
 
     cache = {}
     if TRAIN_CACHE_PATH.exists():
         try:
             cache = joblib.load(TRAIN_CACHE_PATH)
-            logging.info(f"Cache geladen: {len(cache)} Einträge.")
+            logging.info(f"Cache loaded: {len(cache)} entries.")
         except Exception as e:
-            logging.warning(f"Konnte Cache nicht laden: {e}")
+            logging.warning(f"Could not load cache: {e}")
 
     cache_hits = 0
     for pdf_file in tqdm(all_pdf_files, desc="PDFs verarbeiten", unit="file"):
@@ -72,11 +81,11 @@ def train_model() -> Optional[Pipeline]:
             y.append(label)
             
     if not X:
-        logging.warning("Keine Trainingsdaten gefunden!")
+        logging.warning("No training data found!")
         return None
 
     joblib.dump(cache, TRAIN_CACHE_PATH, compress=3)
-    logging.info(f"Verarbeitung abgeschlossen. Cache-Treffer: {cache_hits}")
+    logging.info(f"Processing complete. Cache hits: {cache_hits}")
 
     pipeline = Pipeline([
         ('tfidf', TfidfVectorizer(
@@ -91,10 +100,13 @@ def train_model() -> Optional[Pipeline]:
         ('clf', MultinomialNB(alpha=0.01))
     ])
     
-    logging.info(f"Pipeline Fit startet. Dokumente: {len(X)}, Kategorien: {len(set(y))}")
+    logging.info(f"Pipeline Fit starts. Documents: {len(X)}, Categories: {len(set(y))}")
     fit_start_time = time.time()
     pipeline.fit(X, y)
     fit_end_time = time.time()
     joblib.dump(pipeline, MODEL_PATH, compress=3)
-    logging.info(f"Modell trainiert. Dauer: {fit_end_time - fit_start_time:.2f}s")
+    logging.info(f"Model trained. Duration: {fit_end_time - fit_start_time:.2f}s")
+    
+    global _cached_model
+    _cached_model = pipeline
     return pipeline

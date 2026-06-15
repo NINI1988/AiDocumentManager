@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from pathlib import Path
 from dataclasses import dataclass
 import re
@@ -10,12 +10,10 @@ from typing import List, Tuple, Optional
 import pdfplumber
 
 from .config import (
-    FOLDER_PROJECT, FOLDER_INBOX, FOLDER_REVIEW, FOLDER_UNSURE,
-    TRAIN_DATA_PATH, MODEL_PATH, TRAIN_CACHE_PATH, LOG_FILE, Mode
+    Mode, MODE
 )
 
-# Unterdrücke die gesprächigen Warnungen des PDF-Parsers (pdfminer.six)
-logging.getLogger("pdfminer").setLevel(logging.ERROR)
+logging.getLogger("pdfminer").setLevel(logging.ERROR)  # Suppress verbose warnings from the PDF parser (pdfminer.six)
 
 def extract_text(path: Path, max_pages: int = 5) -> str:
     """Extract embedded OCR/text from first pages using pdfplumber."""
@@ -29,7 +27,7 @@ def extract_text(path: Path, max_pages: int = 5) -> str:
         return ""
 
 def extract_pdf_content(pdf_path: Path):
-    """Extrahiert Text und eine Betreff-Zeile aus einem PDF."""
+    """Extracts text and a subject line from a PDF."""
     text = ""
     subject = "Unbekannt"
     try:
@@ -43,16 +41,16 @@ def extract_pdf_content(pdf_path: Path):
             if not full_text:
                 return None, None
             
-            text = "\n".join(full_text)
-            # Erste Zeile mit Inhalt als Betreff nutzen
+            text = "\n".join(full_text) # Use the first line with content as subject
+            # Use the first line with content as subject
             lines = [l.strip() for l in text.split('\n') if len(l.strip()) > 3]
             if lines:
-                # Bereinige den Betreff von ungültigen Zeichen
+                # Sanitize the subject from invalid characters
                 subject = "".join(c for c in lines[0] if c.isalnum() or c in " -_")[:50]
                 
         return text, subject
     except Exception as e:
-        logging.error(f"Fehler beim Lesen von {pdf_path}: {e}")
+        logging.error(f"Error reading {pdf_path}: {e}")
         return None, None
 
 
@@ -71,30 +69,29 @@ def build_name(d: datetime.date, subj: str) -> str:
 
 
 @dataclass
-class HandlerResult:
-    subject: str
-    date: Optional[datetime.date]
-    subfolder: str  # relative to FOLDER_REVIEW
-
-
-@dataclass
-class Doc:
-    path: Path
-    subject: str
-    date: datetime.date
-    target: Path
-
+class ProcessingContext:
+    input_file: Path
+    text: str
+    subfolder: str
+    date: Optional[datetime.date] = None
+    subject: Optional[str] = None
+    output_file: Optional[Path] = None
+    confidence: float = 0.0
 
 class BaseHandler(ABC):
     """Handler interface for document recognition and metadata extraction."""
 
-    @abstractmethod
-    def handle(self, text: str, path: Path) -> Optional[HandlerResult]:
+    def handle(self, context: ProcessingContext) -> None:
+        """
+        Pre-processing: Handlers check the context and text to refine metadata.
+        """
         pass
 
-    @abstractmethod
-    def get_subfolders(self) -> List[str]:
-        """Return a list of subfolders this handler can process."""
+    def post_process(self, context: ProcessingContext) -> None:
+        """
+        Performs additional operations after the main file movement/copy.
+        Default implementation does nothing.
+        """
         pass
 
 def print_rows_table(rows: List[Tuple[str, str]]) -> None:
@@ -113,15 +110,15 @@ def print_rows_table(rows: List[Tuple[str, str]]) -> None:
     print()
 
 
-def print_docs_table(docs: List[Doc], base_folder: Path) -> None:
+def print_docs_table(contexts: List[ProcessingContext], base_folder: Path) -> None:
     """Print an aligned table of parsed documents (Source, Target) using paths relative to base_folder."""
     rows: List[Tuple[str, str]] = []
-    for doc in docs:
+    for ctx in contexts:
         try:
-            rel = str(doc.target.relative_to(base_folder))
+            rel = str(ctx.output_file.relative_to(base_folder))
         except Exception:
-            rel = str(doc.target)
-        rows.append((doc.path.name, rel))
+            rel = str(ctx.output_file)
+        rows.append((ctx.input_file.name, rel))
     print_rows_table(rows)
 
 
@@ -143,20 +140,20 @@ def unique_path(path: Path) -> Path:
         counter += 1
 
 
-def apply_file_operation(doc: Doc, mode: Mode) -> None:
-    """Apply file operation (move/copy/no-change) for a Doc using the provided Mode enum."""
+def apply_file_operation(context: ProcessingContext) -> None:
+    """Apply file operation (move/copy/no-change) using the global MODE setting."""
     import shutil
 
     # Resolve unique target once here and update doc.target to the resolved path.
-    final_target: Path = unique_path(doc.target)
+    final_target: Path = unique_path(context.output_file)
     final_target.parent.mkdir(parents=True, exist_ok=True)
 
-    if mode == Mode.MOVE:
-        shutil.move(str(doc.path), str(final_target))
-        doc.target = final_target
-    elif mode == Mode.COPY:
-        shutil.copy(str(doc.path), str(final_target))
-        doc.target = final_target
+    if MODE == Mode.MOVE: # else: NO_CHANGE, do nothing
+        shutil.move(str(context.input_file), str(final_target))
+        context.output_file = final_target
+    elif MODE == Mode.COPY:
+        shutil.copy(str(context.input_file), str(final_target))
+        context.output_file = final_target
     # else: NO_CHANGE, do nothing
 
 def wait_if_not_debugging():

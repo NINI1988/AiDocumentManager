@@ -52,23 +52,23 @@ MONTH_NAME_MAP = {
 
 def fuzzy_match(text: str, pattern: str, threshold: float = 0.95) -> bool:
     """Return True if `text` and `pattern` are similar above `threshold`.
-
-    vergleicht zwei Strings als Ganzes
-    sinnvoll, wenn beide Texte in etwa gleich lang sind
-    Beispiel: vollständige Dokumentüberschrift vs. Referenztext
+    
+    compares two strings as a whole
+    useful when both texts are roughly the same length
+    Example: complete document heading vs. reference text
     """
     if not text or not pattern:
         return False
     norm_text = normalize_text(text)
     norm_pattern = normalize_text(pattern)
     return fuzz.ratio(norm_pattern, norm_text, score_cutoff=int(threshold * 100)) >= int(threshold * 100)
-
+    
 
 def fuzzy_contains(text: str, pattern: str, threshold: float = 0.95) -> bool:
     """Return True if a fuzzy occurrence of `pattern` exists inside `text`.
-
-    sucht den besten Teilabgleich zwischen den Strings
-    ideal, wenn ein kürzeres Muster in einem längeren, verrauschten Text vorkommt
+    
+    finds the best partial match between strings
+    ideal when a shorter pattern occurs in a longer, noisy text
     """
     if not text or not pattern:
         return False
