@@ -13,15 +13,15 @@ class Mode(Enum):
 FOLDER_PROJECT = Path(__file__).resolve().parents[1]
 
 # Global setting for file operation mode (used in 1. rename.py)
-MODE = Mode.NO_CHANGE
-FOLDER_INBOX = FOLDER_PROJECT / "1. Inbox"
-FOLDER_REVIEW = FOLDER_PROJECT / "3. Review"
-FOLDER_UNSURE = FOLDER_PROJECT / "2. Unsure"
+# MODE = Mode.NO_CHANGE
+# FOLDER_INBOX = FOLDER_PROJECT / "1. Inbox"
+# FOLDER_REVIEW = FOLDER_PROJECT / "3. Review"
+# FOLDER_UNSURE = FOLDER_PROJECT / "2. Unsure"
 
-# MODE = Mode.MOVE
-# FOLDER_INBOX = Path(r"G:\OneDrive\ScanTest")
-# FOLDER_REVIEW = FOLDER_INBOX / "Review"
-# FOLDER_UNSURE = FOLDER_INBOX / "Unsure"
+MODE = Mode.MOVE
+FOLDER_INBOX = Path(r"G:\OneDrive\Scan")
+FOLDER_REVIEW = FOLDER_INBOX / "Review"
+FOLDER_UNSURE = FOLDER_INBOX / "Unsure"
 
 TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "alleDokumente"
 MODEL_PATH = FOLDER_PROJECT / "classifier_model_word.pkl"
