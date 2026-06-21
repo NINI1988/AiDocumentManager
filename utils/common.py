@@ -81,6 +81,13 @@ class ProcessingContext:
 class BaseHandler(ABC):
     """Handler interface for document recognition and metadata extraction."""
 
+    def setup(self) -> None:
+        """
+        Optional one-time initialization before a processing batch starts.
+        Default implementation does nothing.
+        """
+        pass
+
     def handle(self, context: ProcessingContext) -> None:
         """
         Pre-processing: Handlers check the context and text to refine metadata.
@@ -90,6 +97,13 @@ class BaseHandler(ABC):
     def post_process(self, context: ProcessingContext) -> None:
         """
         Performs additional operations after the main file movement/copy.
+        Default implementation does nothing.
+        """
+        pass
+
+    def teardown(self) -> None:
+        """
+        Optional cleanup after a processing batch ends.
         Default implementation does nothing.
         """
         pass

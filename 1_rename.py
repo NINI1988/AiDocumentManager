@@ -2,9 +2,9 @@ import logging
 from pathlib import Path
 from tqdm import tqdm
 
+from handlers import HANDLERS
 from utils.config import FOLDER_INBOX, FOLDER_REVIEW, FOLDER_UNSURE, LOG_FILE, MODE
 from utils.processor import process_file
-from utils.llm_extractor import get_llm, unload_llm
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,12 +26,14 @@ def main():
     print(f"Mode: '{MODE.value}'")
     print(f"Parsing {len(files)} files...\n")
 
-    get_llm()  # Pre-load LLM singleton before the processing loop
     try:
+        for handler in HANDLERS:
+            handler.setup()
         for file_path in tqdm(files, desc="Parsing files", unit="file"):
             process_file(file_path)
     finally:
-        unload_llm()
+        for handler in reversed(HANDLERS):
+            handler.teardown()
 
 
 if __name__ == "__main__":
