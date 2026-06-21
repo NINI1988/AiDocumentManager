@@ -21,7 +21,7 @@ def main():
     if not files:
         print("Inbox is empty.")
         return
-    
+
     # Phase 1: Parse all files
     print(f"Mode: '{MODE.value}'")
     print(f"Parsing {len(files)} files...\n")

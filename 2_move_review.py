@@ -4,6 +4,7 @@ import shutil
 from utils.config import DEST_ROOT, FOLDER_REVIEW
 from utils.common import wait_if_not_debugging
 
+
 def move_review_files() -> None:
     if not FOLDER_REVIEW.exists():
         print(f"Review folder not found: {FOLDER_REVIEW}")
@@ -15,13 +16,11 @@ def move_review_files() -> None:
 
     files = [path for path in FOLDER_REVIEW.rglob("*") if path.is_file()]
     moved = 0
-    # rows: list[tuple[str, str]] = []
 
     for src_path in files:
         relative_path = src_path.relative_to(FOLDER_REVIEW)
         dest_path = DEST_ROOT / relative_path
 
-        # Do not overwrite existing files; raise an error if destination exists.
         if dest_path.exists():
             raise FileExistsError(f"Destination exists: {dest_path}")
 
@@ -30,7 +29,6 @@ def move_review_files() -> None:
         try:
             shutil.move(str(src_path), str(dest_path))
             moved += 1
-            # rows.append((str(src_path), str(dest_path)))
             print(f"Moved: {dest_path}")
         except Exception as exc:
             print(f"Failed to move {src_path}: {exc}")
@@ -41,9 +39,8 @@ def move_review_files() -> None:
         print("No files were moved.")
         return
 
-    # print_rows_table(rows)
     print(f"Done. {moved}/{len(files)} file(s) moved.")
-    
+
     removed_dirs = remove_empty_directories(FOLDER_REVIEW)
     if removed_dirs:
         print(f"Removed {removed_dirs} empty folder(s) from '{FOLDER_REVIEW}'.")
@@ -63,8 +60,9 @@ def remove_empty_directories(root: Path) -> int:
 
 if __name__ == "__main__":
     try:
-        move_review_files() 
+        move_review_files()
     except Exception as e:
         print(f"Error during moving files: {e}")
     finally:
         wait_if_not_debugging()
+
