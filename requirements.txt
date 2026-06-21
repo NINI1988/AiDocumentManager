@@ -9,5 +9,6 @@ scikit-learn
 watchdog
 pystray
 Pillow
+python-dotenv
 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
 llama-cpp-python

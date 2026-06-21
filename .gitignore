@@ -12,3 +12,4 @@ test_documents/
 log.txt
 *.joblib
 *.log
+.env

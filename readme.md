@@ -2,7 +2,7 @@
 
 Local document sorting, renaming, and review for scanned PDFs.
 
-All document data stays on your machine. Before using the project, update [`utils/config.py`](./utils/config.py) with your folder paths, destination root, and local model path.
+All document data stays on your machine. Before using the project, copy [`.env.example`](./.env.example) to `.env` in the project root and fill in your local paths.
 
 ## Overview
 
@@ -26,26 +26,30 @@ pip install -r requirements.txt
 
 ## Configure
 
-Edit [`utils/config.py`](./utils/config.py) before running the scripts.
-
-Key settings:
+Required settings in `.env`:
 
 - `FOLDER_INBOX`: input folder containing new PDFs
+- `DEST_ROOT`: final destination root for reviewed documents
+- `LLM_MODEL_PATH`: path to the local GGUF model
+
+Optional settings in `.env`:
+
 - `FOLDER_REVIEW`: staging folder for files that need review
 - `FOLDER_UNSURE`: staging folder for files that could not be classified confidently
-- `DEST_ROOT`: final destination root for reviewed documents
 - `MODE`: controls whether processing moves, copies, or leaves files unchanged
-- `LLM_MODEL_PATH`: path to the local GGUF model
+- `TRAIN_DATA_PATH`: separate training root, defaults to `DEST_ROOT`
 - `UNSURE_THRESHOLD`: confidence threshold for auto-classification
+- `ERROR_PAUSE_SECONDS`: pause after an error, in seconds
 
 The current setup expects a local model such as:
 
 - https://huggingface.co/lmstudio-community/gemma-4-E4B-it-QAT-GGUF/tree/main
-  - Expected VRAM: around 6 GB for the configured setup
+- Expected VRAM: around 6 GB for the configured setup
 
 The repository is configured for GPU inference through `llama-cpp-python` with CUDA 12.5. If GPU support is not available, the model can still run on CPU, but it will be slower.
-  - [Install CUDA toolchain 12.5](https://developer.nvidia.com/cuda-12-5-0-download-archive)
-  - Required to run the LLM model on GPU instead of falling back to CPU
+
+- [Install CUDA toolchain 12.5](https://developer.nvidia.com/cuda-12-5-0-download-archive)
+- Required to run the LLM model on GPU instead of falling back to CPU
 
 ## Usage
 
@@ -94,8 +98,8 @@ Add that command to startup if you want it to run automatically.
 ## Customization
 
 - add special-case handlers in `handlers/`
-- update folder mappings and thresholds in `utils/config.py`
-- change `MODE` to test without moving files
+- update folder mappings and thresholds in `.env`
+- change `MODE` in `.env` to test without moving files
 
 ## Scanner Notes for NAPS2
 
