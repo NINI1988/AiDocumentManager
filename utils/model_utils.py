@@ -22,23 +22,11 @@ def get_file_hash(path: Path) -> str:
             hasher.update(chunk)
     return hasher.hexdigest()
 
-_cached_model: Optional[Pipeline] = None
-_model_load_attempted: bool = False
-
 def get_model() -> Optional[Pipeline]:
     """Loads the model if it exists; training is explicit via train_model()."""
-    global _cached_model, _model_load_attempted
-    if _cached_model is not None:
-        return _cached_model
-
-    if _model_load_attempted:
-        return None
-    _model_load_attempted = True
-
     if MODEL_PATH.exists():
         try:
-            _cached_model = joblib.load(MODEL_PATH)
-            return _cached_model
+            return joblib.load(MODEL_PATH)
         except Exception as e:
             logging.error(f"Error loading the model: {e}")
 
@@ -111,7 +99,4 @@ def train_model() -> Optional[Pipeline]:
     fit_end_time = time.time()
     joblib.dump(pipeline, MODEL_PATH, compress=3)
     logging.info(f"Model trained. Duration: {fit_end_time - fit_start_time:.2f}s")
-    
-    global _cached_model
-    _cached_model = pipeline
     return pipeline

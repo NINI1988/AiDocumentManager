@@ -4,6 +4,16 @@ from utils.common import BaseHandler, ProcessingContext
 from utils.llm_extractor import extract_metadata_with_llm
 
 class LLMMetadataHandler(BaseHandler):
+    def setup(self) -> None:
+        from utils.llm_extractor import get_llm
+
+        if not get_llm():
+            raise RuntimeError("Local LLM model not available.")
+
+    def teardown(self) -> None:
+        from utils.llm_extractor import unload_llm
+
+        unload_llm()
     
     def handle(self, context: ProcessingContext) -> None:
         """

@@ -41,11 +41,13 @@ def process_files_worker(files: list, queue: multiprocessing.Queue, error_queue:
             format="%(asctime)s [Worker] %(message)s",
             encoding="utf-8"
         )
-        from utils.llm_extractor import get_llm, unload_llm
+        from handlers import HANDLERS
         from utils.processor import process_file
 
         try:
-            get_llm()  # Pre-load LLM to initialize CUDA/GPU memory before processing
+            for handler in HANDLERS:
+                handler.setup()
+
             for i, f in enumerate(files, 1):
                 if stop_event.is_set():
                     break
@@ -54,8 +56,15 @@ def process_files_worker(files: list, queue: multiprocessing.Queue, error_queue:
         except Exception as e:
             error_queue.put(str(e))
             sys.exit(1)
-    finally:
-        unload_llm()
+        finally:
+            for handler in reversed(HANDLERS):
+                try:
+                    handler.teardown()
+                except Exception as e:
+                    logging.error(f"Error during handler teardown: {e}")
+    except Exception as e:
+        error_queue.put(f"Worker process startup error: {e}")
+        sys.exit(1)
 
 class WatchdogService:
     def __init__(self) -> None:
