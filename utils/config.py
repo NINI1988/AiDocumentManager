@@ -23,7 +23,8 @@ MODE = Mode.MOVE
 FOLDER_INBOX = Path(r"G:\OneDrive\Scan")
 FOLDER_REVIEW = FOLDER_INBOX / "Review"
 FOLDER_UNSURE = FOLDER_INBOX / "Unsure"
-# Destination root for final document storage (used in 2_move_review.py)
+
+# Destination root for final document storage (used in 2_move_review.py and TRAIN_DATA_PATH)
 DEST_ROOT = Path(r"G:\OneDrive\Dokumente")
 
 # TRAIN_DATA_PATH = FOLDER_PROJECT / "test_documents" / "alleDokumente"

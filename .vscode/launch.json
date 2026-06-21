@@ -8,7 +8,7 @@
             "name": "Python Debugger: Rename",
             "type": "debugpy",
             "request": "launch",
-            "program": "1. rename.py",
+            "program": "1_rename.py",
             "console": "integratedTerminal"
         }
     ]
