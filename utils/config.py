@@ -25,7 +25,7 @@ load_dotenv()
 def _require_env(name: str) -> str:
     value = os.getenv(name)
     if not value:
-        raise RuntimeError(f"Missing required environment variable: {name}")
+        raise RuntimeError(f"Missing required environment variable: '{name}'")
     return value.strip()
 
 
@@ -40,7 +40,7 @@ def _path_env(name: str, default: Optional[Path] = None) -> Path:
         return Path(value)
     if default is not None:
         return default
-    raise RuntimeError(f"Missing required environment variable: {name}")
+    raise RuntimeError(f"Missing required environment variable: '{name}'")
 
 
 def _mode_env(name: str, default: Mode) -> Mode:
@@ -51,7 +51,7 @@ def _mode_env(name: str, default: Mode) -> Mode:
         return Mode[value.strip().upper()]
     except KeyError as exc:
         valid = ", ".join(mode.value for mode in Mode)
-        raise RuntimeError(f"Invalid {name} value {value!r}. Expected one of: {valid}") from exc
+        raise RuntimeError(f"Invalid '{name}' value '{value!r}'. Expected one of: '{valid}'") from exc
 
 
 MODE = _mode_env("MODE", Mode.MOVE)
