@@ -52,32 +52,38 @@ def train_model() -> Optional[Pipeline]:
             logging.warning(f"Could not load cache: {e}")
 
     cache_hits = 0
-    for pdf_file in tqdm(all_pdf_files, desc="PDFs verarbeiten", unit="file"):
-        rel_path = pdf_file.relative_to(TRAIN_DATA_PATH)
-        parts = rel_path.parts[:-1]
-        if not parts:
-            continue
-        
-        label = os.path.join(*parts)
-        file_hash = get_file_hash(pdf_file)
-        
-        if file_hash in cache:
-            norm_text = cache[file_hash]
-            cache_hits += 1
-        else:
-            text, _ = extract_pdf_content(pdf_file)
-            norm_text = normalize_text(text) if text else ""
-            cache[file_hash] = norm_text
-
-        if norm_text and len(norm_text.strip()) > 10:
-            X.append(norm_text)
-            y.append(label)
+    new_entries = 0
+    try:
+        for pdf_file in tqdm(all_pdf_files, desc="PDFs verarbeiten", unit="file"):
+            rel_path = pdf_file.relative_to(TRAIN_DATA_PATH)
+            parts = rel_path.parts[:-1]
+            if not parts:
+                continue
             
+            label = os.path.join(*parts)
+            file_hash = get_file_hash(pdf_file)
+            
+            if file_hash in cache:
+                norm_text = cache[file_hash]
+                cache_hits += 1
+            else:
+                text, _ = extract_pdf_content(pdf_file)
+                norm_text = normalize_text(text) if text else ""
+                cache[file_hash] = norm_text
+                new_entries += 1
+
+            if norm_text and len(norm_text.strip()) > 10:
+                X.append(norm_text)
+                y.append(label)
+    finally:
+        if new_entries > 0:
+            joblib.dump(cache, TRAIN_CACHE_PATH, compress=3)
+            logging.info(f"Cache saved with {new_entries} new entries (total {len(cache)}).")
+
     if not X:
         logging.warning("No training data found!")
         return None
 
-    joblib.dump(cache, TRAIN_CACHE_PATH, compress=3)
     logging.info(f"Processing complete. Cache hits: {cache_hits}")
 
     pipeline = Pipeline([
