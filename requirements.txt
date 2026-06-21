@@ -1,6 +1,13 @@
+pdfplumber
+joblib
+pandas
+numpy
 tqdm
 rapidfuzz
-pdfplumber
-
-# Optional/test dependencies
-# pytest
+xgboost
+scikit-learn
+watchdog
+pystray
+Pillow
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu125
+llama-cpp-python

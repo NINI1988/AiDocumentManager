@@ -1,14 +1,28 @@
-# handlers package
+from typing import List
+
 from handlers.deka import DekaBankHandler
-from handlers.rente import RentenversicherungHandler
+from utils.common import BaseHandler
+from .tax import TaxHandler
+from .subfolder import SubfolderHandler
+from .llm_metadata import LLMMetadataHandler
+from .fallback import FallbackHandler
 
 from .canway import CanwayMeldebescheinigungZurSozialversicherungHandler, CanwayRechnungHandler
 
-HANDLERS = [
+HANDLERS: List[BaseHandler] = [
+    SubfolderHandler(),
     CanwayRechnungHandler(),
     CanwayMeldebescheinigungZurSozialversicherungHandler(),
-    RentenversicherungHandler(),
-    DekaBankHandler()
+    DekaBankHandler(),
+    LLMMetadataHandler(),
+    TaxHandler(),
+    FallbackHandler(),
 ]
-
-__all__ = ["CanwayRechnungHandler", "CanwayMeldebescheinigungZurSozialversicherungHandler", "RentenversicherungHandler", "DekaBankHandler", "HANDLERS"]
+__all__ = [
+    "SubfolderHandler", 
+    "CanwayRechnungHandler", 
+    "CanwayMeldebescheinigungZurSozialversicherungHandler", 
+    "DekaBankHandler", 
+    "TaxHandler", 
+    "HANDLERS"
+]
