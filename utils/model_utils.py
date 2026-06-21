@@ -3,6 +3,7 @@ import logging
 import joblib
 import time
 import hashlib
+import sys
 from pathlib import Path
 from typing import Optional
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -44,6 +45,7 @@ def train_model() -> Optional[Pipeline]:
     """Trains the model based on the existing folder structure."""
     logging.info(f"Starting training with data from: {TRAIN_DATA_PATH}")
     X, y = [], []
+    show_progress = sys.stderr is not None
     
     all_pdf_files = list(TRAIN_DATA_PATH.rglob("*.pdf"))
     if not all_pdf_files:
@@ -59,7 +61,7 @@ def train_model() -> Optional[Pipeline]:
             logging.warning(f"Could not load cache: {e}")
 
     cache_hits = 0
-    for pdf_file in tqdm(all_pdf_files, desc="PDFs verarbeiten", unit="file"):
+    for pdf_file in tqdm(all_pdf_files, desc="PDFs verarbeiten", unit="file", disable=not show_progress):
         rel_path = pdf_file.relative_to(TRAIN_DATA_PATH)
         parts = rel_path.parts[:-1]
         if not parts:
