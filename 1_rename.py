@@ -19,7 +19,7 @@ def main():
 
     files = list(FOLDER_INBOX.glob("*.pdf"))
     if not files:
-        print("Inbox is empty.")
+        print(f"Inbox '{FOLDER_INBOX}' is empty.")
         return
 
     # Phase 1: Parse all files
