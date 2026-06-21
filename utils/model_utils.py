@@ -24,12 +24,17 @@ def get_file_hash(path: Path) -> str:
     return hasher.hexdigest()
 
 _cached_model: Optional[Pipeline] = None
+_model_load_attempted: bool = False
 
 def get_model() -> Optional[Pipeline]:
-    """Loads the model or retrains it if not present (Singleton)."""
-    global _cached_model
+    """Loads the model if it exists; training is explicit via train_model()."""
+    global _cached_model, _model_load_attempted
     if _cached_model is not None:
         return _cached_model
+
+    if _model_load_attempted:
+        return None
+    _model_load_attempted = True
 
     if MODEL_PATH.exists():
         try:
@@ -37,9 +42,9 @@ def get_model() -> Optional[Pipeline]:
             return _cached_model
         except Exception as e:
             logging.error(f"Error loading the model: {e}")
-    
-    _cached_model = train_model()
-    return _cached_model
+
+    logging.error(f"Model file not found or unavailable: {MODEL_PATH}. Run 'python train_model.py' first.")
+    return None
 
 def train_model() -> Optional[Pipeline]:
     """Trains the model based on the existing folder structure."""
