@@ -39,7 +39,7 @@ def load_dataset():
         if file_hash in cache:
             norm_text = cache[file_hash]
         else:
-            text, _ = extract_pdf_content(pdf_file)
+            text = extract_pdf_content(pdf_file)
             norm_text = normalize_text(text) if text else ""
 
         if norm_text and len(norm_text.strip()) > 10:
