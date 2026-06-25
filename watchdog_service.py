@@ -149,10 +149,9 @@ class WatchdogService:
         )
 
     def open_folder(self, icon, item) -> None:
-        """Open the scan folder in Explorer when tray icon is double-clicked (default action)."""
+        """Open the scan folder in Explorer when tray icon is clicked (default action)."""
         try:
-            os.startfile(r"G:\scan")
-            logging.info("Opened scan folder via tray icon.")
+            os.startfile(str(FOLDER_INBOX))
         except Exception as e:
             logging.error(f"Failed to open scan folder: {e}")
 
