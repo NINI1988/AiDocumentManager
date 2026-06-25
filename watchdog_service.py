@@ -2,6 +2,7 @@ import time
 import logging
 import multiprocessing
 import threading
+import os
 import sys
 from datetime import datetime, timedelta
 from enum import Enum
@@ -142,9 +143,18 @@ class WatchdogService:
 
     def create_menu(self) -> pystray.Menu:
         return pystray.Menu(
+            pystray.MenuItem("Open scan folder", self.open_folder, default=True),
             pystray.MenuItem(lambda item: "Resume" if (self.is_paused or self.error_pause_until) else "Pause", self.toggle_pause),
             pystray.MenuItem("Exit", self.stop_service)
         )
+
+    def open_folder(self, icon, item) -> None:
+        """Open the scan folder in Explorer when tray icon is double-clicked (default action)."""
+        try:
+            os.startfile(r"G:\scan")
+            logging.info("Opened scan folder via tray icon.")
+        except Exception as e:
+            logging.error(f"Failed to open scan folder: {e}")
 
     def toggle_pause(self) -> None:
         if self.error_pause_until:
