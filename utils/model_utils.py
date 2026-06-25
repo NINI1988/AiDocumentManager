@@ -67,7 +67,7 @@ def train_model() -> Optional[Pipeline]:
                 norm_text = cache[file_hash]
                 cache_hits += 1
             else:
-                text, _ = extract_pdf_content(pdf_file)
+                text = extract_pdf_content(pdf_file)
                 norm_text = normalize_text(text) if text else ""
                 cache[file_hash] = norm_text
                 new_entries += 1

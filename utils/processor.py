@@ -15,7 +15,7 @@ def process_file(file_path: Path):
     logging.info(f"Processing file: {file_path.name}")
     
     # 1. Extract text
-    text, _ = extract_pdf_content(file_path)
+    text = extract_pdf_content(file_path)
 
     # 2. Initialize context
     context = ProcessingContext(

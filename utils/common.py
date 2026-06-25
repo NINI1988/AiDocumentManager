@@ -7,51 +7,30 @@ import logging
 import sys
 from typing import List, Tuple, Optional
 
-import pdfplumber
+import fitz  # pymupdf
 
 from .config import (
     Mode, MODE
 )
 
-logging.getLogger("pdfminer").setLevel(logging.ERROR)  # Suppress verbose warnings from the PDF parser (pdfminer.six)
 
-def extract_text(path: Path, max_pages: int = 5) -> str:
-    """Extract embedded OCR/text from first pages using pdfplumber."""
+def extract_pdf_content(pdf_path: Path) -> Optional[str]:
+    """Extracts text from a PDF using PyMuPDF."""
     try:
-        texts = []
-        with pdfplumber.open(path) as pdf:
-            for page in pdf.pages[:max_pages]:
-                texts.append(page.extract_text() or "")
-        return "\n".join(texts)
-    except Exception:
-        return ""
-
-def extract_pdf_content(pdf_path: Path):
-    """Extracts text and a subject line from a PDF."""
-    text = ""
-    subject = "Unbekannt"
-    try:
-        with pdfplumber.open(pdf_path) as pdf:
+        with fitz.open(pdf_path) as doc:
             full_text = []
-            for page in pdf.pages:
-                page_text = page.extract_text()
+            for page in doc:
+                page_text = page.get_text()
                 if page_text:
                     full_text.append(page_text)
             
             if not full_text:
-                return None, None
+                return None
             
-            text = "\n".join(full_text) # Use the first line with content as subject
-            # Use the first line with content as subject
-            lines = [l.strip() for l in text.split('\n') if len(l.strip()) > 3]
-            if lines:
-                # Sanitize the subject from invalid characters
-                subject = "".join(c for c in lines[0] if c.isalnum() or c in " -_")[:50]
-                
-        return text, subject
+            return "\n".join(full_text)
     except Exception as e:
         logging.error(f"Error reading {pdf_path}: {e}")
-        return None, None
+        return None
 
 
 def sanitize(s: str) -> str:
